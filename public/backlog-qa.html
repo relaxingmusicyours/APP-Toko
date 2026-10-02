@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>POS GG Online — Pengaturan · Backlog &amp; QA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --background: hsl(210 40% 98%);
+        --foreground: hsl(222 47% 11%);
+        --card: hsl(0 0% 100%);
+        --muted: hsl(210 40% 96%);
+        --muted-fg: hsl(215 16% 47%);
+        --border: hsl(214 32% 91%);
+        --primary: hsl(222 55% 20%);
+        --navy-900: #0d1832;
+        --navy-800: #16264f;
+        --lime: #b8f24a;
+        --teal: #16c79a;
+        --amber: #ffb020;
+        --radius: 0.75rem;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        background: var(--background);
+        color: var(--foreground);
+        font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .num { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+      /* TOP BAR */
+      .topbar { background: linear-gradient(120deg, var(--navy-900), var(--navy-800)); color: #eef3fb; }
+      .topbar-inner {
+        max-width: 1200px; margin: 0 auto; padding: 14px 24px;
+        display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      }
+      .brand { display: flex; align-items: center; gap: 12px; }
+      .brand-mark {
+        width: 38px; height: 38px; border-radius: 10px; background: var(--lime); color: var(--navy-900);
+        display: grid; place-items: center; font-weight: 800; font-size: 15px; letter-spacing: -0.5px;
+        box-shadow: 0 4px 14px rgba(184, 242, 74, 0.35);
+      }
+      .brand-name { font-weight: 800; font-size: 15px; }
+      .brand-sub { font-size: 11.5px; opacity: 0.65; }
+      .topbar-badge {
+        font-size: 11px; font-weight: 600; padding: 5px 11px; border-radius: 999px;
+        background: rgba(184, 242, 74, 0.14); color: var(--lime); border: 1px solid rgba(184, 242, 74, 0.35);
+      }
+
+      /* LAYOUT */
+      .container { max-width: 1200px; margin: 0 auto; padding: 28px 24px 56px; }
+      .page-head h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.4px; }
+      .page-head p { margin-top: 4px; font-size: 13.5px; color: var(--muted-fg); }
+
+      .tabs {
+        margin-top: 18px; display: flex; flex-wrap: wrap; gap: 4px; padding: 4px;
+        background: var(--card); border: 1px solid var(--border); border-radius: 14px; width: fit-content;
+      }
+      .tab {
+        border: 0; background: transparent; cursor: pointer; font: inherit; color: var(--muted-fg);
+        font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 9px;
+      }
+      .tab:hover { background: var(--muted); color: var(--foreground); }
+      .tab.active { background: var(--primary); color: #eef3fb; box-shadow: 0 1px 3px rgba(13, 24, 50, 0.25); }
+      .tab .cnt { font-size: 11px; opacity: 0.7; margin-left: 5px; }
+
+      /* STAT CARDS */
+      .stats { margin-top: 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+      .stat {
+        background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+        padding: 16px; box-shadow: 0 1px 2px rgba(13, 24, 50, 0.05); transition: box-shadow 0.15s;
+      }
+      .stat:hover { box-shadow: 0 4px 12px rgba(13, 24, 50, 0.09); }
+      .stat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-fg); }
+      .stat-value { margin-top: 8px; font-size: 24px; font-weight: 800; letter-spacing: -0.4px; }
+      .stat-hint { margin-top: 4px; font-size: 12px; color: var(--muted-fg); }
+      .tone-warning { color: #d97706; }
+      .tone-positive { color: #059669; }
+      .tone-negative { color: #e11d48; }
+
+      /* SECTION HEADER */
+      .section-head { margin: 26px 0 12px; display: flex; align-items: center; gap: 9px; }
+      .section-head svg { color: var(--muted-fg); }
+      .section-head p { font-size: 13.5px; font-weight: 700; }
+
+      /* BADGES */
+      .badge {
+        display: inline-flex; align-items: center; gap: 4px; padding: 2.5px 10px;
+        border-radius: 999px; font-size: 11px; font-weight: 700; border: 1px solid transparent; white-space: nowrap;
+      }
+      .b-danger  { background: #fff1f2; color: #be123c; }
+      .b-warning { background: #fffbeb; color: #b45309; }
+      .b-success { background: #ecfdf5; color: #047857; }
+      .b-info    { background: #f0f9ff; color: #0369a1; }
+      .b-outline { background: transparent; color: var(--muted-fg); border-color: var(--border); }
+      .b-lime    { background: rgba(184, 242, 74, 0.3); color: var(--navy-800); }
+
+      /* EPIC CARDS */
+      .epics { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+      .epic { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: 0 1px 2px rgba(13, 24, 50, 0.05); }
+      .epic-top { display: flex; align-items: center; justify-content: space-between; }
+      .epic-progress { font-size: 11.5px; color: var(--muted-fg); }
+      .epic-title { margin-top: 10px; font-size: 14.5px; font-weight: 700; }
+      .epic-desc { margin-top: 2px; font-size: 12px; color: var(--muted-fg); }
+      .epic ul { margin-top: 12px; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+      .epic li { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; }
+      .epic li.done span { color: var(--muted-fg); }
+      .epic li.open span { color: rgba(15, 23, 42, 0.85); }
+      .ic-done { color: #10b981; flex-shrink: 0; margin-top: 1.5px; }
+      .ic-open { color: rgba(100, 116, 139, 0.45); flex-shrink: 0; margin-top: 1.5px; }
+
+      /* CALLOUT */
+      .callout {
+        margin-top: 14px; background: #fffbeb; border: 1px solid #fde68a; border-radius: var(--radius); padding: 16px;
+        display: flex; gap: 12px; align-items: flex-start;
+      }
+      .callout svg { color: #d97706; flex-shrink: 0; margin-top: 2px; }
+      .callout .t { font-size: 13.5px; font-weight: 700; }
+      .callout .d { margin-top: 4px; font-size: 13px; line-height: 1.6; color: var(--muted-fg); }
+      .callout .d strong { color: var(--foreground); }
+
+      /* QA CARD */
+      .qa-card { margin-top: 14px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 1px 2px rgba(13, 24, 50, 0.05); overflow: hidden; }
+      .qa-head { padding: 16px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+      .qa-title { display: flex; align-items: center; gap: 9px; }
+      .qa-title svg { color: var(--muted-fg); }
+      .qa-title p { font-size: 13.5px; font-weight: 700; }
+      .qa-meter { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted-fg); }
+      .qa-meter .val { font-weight: 700; color: var(--foreground); }
+      .track { width: 110px; height: 6px; border-radius: 999px; background: var(--muted); overflow: hidden; }
+      .fill { height: 100%; width: 0%; border-radius: 999px; background: var(--lime); transition: width 0.25s ease; }
+
+      .table-wrap { overflow-x: auto; }
+      table { width: 100%; border-collapse: collapse; min-width: 760px; }
+      thead th {
+        text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+        color: var(--muted-fg); background: hsl(210 40% 98%); padding: 10px 14px; border-bottom: 1px solid var(--border);
+      }
+      tbody td { padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
+      tbody tr:last-child td { border-bottom: 0; }
+      tbody tr:hover { background: hsl(210 40% 98%); }
+      tbody tr.gap { background: #fff1f2; }
+      tbody tr.gap:hover { background: #ffe4e6; }
+      td.id { font-size: 12px; font-weight: 600; }
+      td.scen { font-weight: 600; }
+      td.exp { color: var(--muted-fg); }
+      input.qa-check { width: 16px; height: 16px; accent-color: var(--lime); cursor: pointer; }
+
+      .qa-foot { padding: 12px 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted-fg); line-height: 1.6; }
+
+      .snapshot-note { margin-top: 20px; text-align: center; font-size: 12px; color: var(--muted-fg); }
+      .snapshot-note a { color: var(--navy-800); font-weight: 600; }
+
+      @media (max-width: 640px) {
+        .topbar-inner { padding: 12px 16px; }
+        .container { padding: 20px 16px 48px; }
+        .topbar-badge { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- TOP BAR -->
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <div class="brand-mark">GG</div>
+          <div>
+            <div class="brand-name">POS GG Online</div>
+            <div class="brand-sub">ERP Kasir, Penjualan &amp; Akuntansi</div>
+          </div>
+        </div>
+        <span class="topbar-badge">Snapshot Antarmuka · Data Statis</span>
+      </div>
+    </header>
+
+    <main class="container">
+      <!-- PAGE HEAD -->
+      <div class="page-head">
+        <h1>Pengaturan</h1>
+        <p>Profil perusahaan, Chart of Accounts, audit trail, roadmap, backlog, dan checklist QA.</p>
+      </div>
+
+      <!-- TABS -->
+      <div class="tabs">
+        <button class="tab">Perusahaan</button>
+        <button class="tab">Chart of Accounts</button>
+        <button class="tab">Audit Trail</button>
+        <button class="tab">Roadmap</button>
+        <button class="tab active">Backlog &amp; QA <span class="cnt">14</span></button>
+      </div>
+
+      <!-- STATS -->
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-label">P0 tersisa</div>
+          <div class="stat-value num tone-warning">3</div>
+          <div class="stat-hint">wajib sebelum go-live</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">QA lulus</div>
+          <div class="stat-value num tone-positive">17/20</div>
+          <div class="stat-hint">terverifikasi engine &amp; unit test</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Uji manual</div>
+          <div class="stat-value num">2</div>
+          <div class="stat-hint">cek visual di aplikasi</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Temuan terbuka</div>
+          <div class="stat-value num tone-negative">1</div>
+          <div class="stat-hint">masuk backlog P0</div>
+        </div>
+      </div>
+
+      <!-- SECTION: BACKLOG -->
+      <div class="section-head">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg>
+        <p>Backlog produk (§26) — epic P0–P2</p>
+        <span class="badge b-outline">14 item terbuka</span>
+      </div>
+
+      <div class="epics">
+        <!-- P0 -->
+        <div class="epic">
+          <div class="epic-top">
+            <span class="badge b-danger">P0</span>
+            <span class="epic-progress num">6/9 selesai</span>
+          </div>
+          <p class="epic-title">Fondasi go-live</p>
+          <p class="epic-desc">Wajib stabil sebelum dipakai bisnis nyata.</p>
+          <ul>
+            <li class="done"><svg class="ic-done" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg><span>Engine double-entry + audit trail</span></li>
+            <li class="done"><svg class="ic-done" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg><span>Kasir POS, penjualan, pembelian, retur</span></li>
+            <li class="done"><svg class="ic-done" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg><span>Persediaan multi-gudang + stok opname</span></li>
+            <li class="done"><svg class="ic-done" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg><span>Aset tetap: penyusutan &amp; disposal</span></li>
+            <li class="done"><svg class="ic-done" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg><span>Laporan inti, aging, PPN, register aset</span></li>
+            <li class="done"><svg class="ic-done" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg><span>Unit test helper aging (7/7 lulus)</span></li>
+            <li class="open"><svg class="ic-open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/></svg><span>Validasi stok cukup di POS &amp; penjualan (temuan TC-11)</span></li>
+            <li class="open"><svg class="ic-open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/></svg><span>RBAC dasar: pemilik / kasir / pembukuan</span></li>
+            <li class="open"><svg class="ic-open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/></svg><span>Lock periode (tutup buku)</span></li>
+          </ul>
+        </div>
+
+        <!-- P1 -->
+        <div class="epic">
+          <div class="epic-top">
+            <span class="badge b-warning">P1</span>
+            <span class="epic-progress num">0/6 selesai</span>
+          </div>
+          <p class="epic-title">Operasional lanjutan</p>
+          <p class="epic-desc">Naikkan produktivitas harian pengguna.</p>
+          <ul>
+            <li class="open"><svg class="ic-open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/></svg><span>Approval workflow (void &amp; diskon besar)</span></li>
+            <li class="open"><svg class="ic-open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/></svg><span>Quotation → SO → DO; PO penerimaan parsial</span></li>
+            <li class="open"><svg class="ic-open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/></svg><span>Rekonsiliasi bank (import mutasi)</span></li>
+            <li class="open"><svg class="ic-open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/></svg><span>Cetak struk thermal 58mm &amp; faktur ber-KOP</span></li>
+            <li class="open"><svg class="ic-open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/></svg><span>Scanner barcode &amp; multi-harga (retail/grosir)</span></li>
+            <li class="open"><svg class="ic-open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/></svg><span>Perbandingan periode &amp; anggaran di laporan</span></li>
+          </ul>
+        </div>
+
+        <!-- P2 -->
+        <div class="epic">
+          <div class="epic-top">
+            <span class="badge b-info">P2</span>
+            <span class="epic-progress num">0/5 selesai</span>
+          </div>
+          <p class="epic-title">Ekspansi &amp; integrasi</p>
+          <p class="epic-desc">Setelah ledger &amp; operasional matang.</p>
+          <ul>
+            <li class="open"><svg class="ic-open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/></svg><span>e-Faktur / Smartlink Tax connector</span></li>
+            <li class="open"><svg class="ic-open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/></svg><span>Integrasi marketplace &amp; payment gateway</span></li>
+            <li class="open"><svg class="ic-open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/></svg><span>Manufaktur: BOM, work order, variance</span></li>
+            <li class="open"><svg class="ic-open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/></svg><span>Multi cabang &amp; profit center proyek</span></li>
+            <li class="open"><svg class="ic-open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/></svg><span>API publik &amp; webhook</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- CALLOUT TEMUAN -->
+      <div class="callout">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        <div>
+          <p class="t">Temuan QA aktif</p>
+          <p class="d"><strong class="num">TC-11</strong> — penjualan di POS belum memvalidasi ketersediaan stok: transaksi tetap diterima dan stok bisa minus. Solusinya masuk backlog <span class="badge b-danger">P0</span> item “Validasi stok cukup di POS &amp; penjualan”.</p>
+        </div>
+      </div>
+
+      <!-- SECTION: QA TABLE -->
+      <div class="qa-card">
+        <div class="qa-head">
+          <div class="qa-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>
+            <p>Test Case Kritis (§27)</p>
+            <span class="badge b-outline">20 kasus</span>
+          </div>
+          <div class="qa-meter">
+            <span class="val num" id="qa-counter">0/20</span>
+            <span>terverifikasi sesi ini</span>
+            <div class="track"><div class="fill" id="qa-bar"></div></div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 40px;"></th>
+                <th>ID</th>
+                <th>Modul</th>
+                <th>Skenario</th>
+                <th>Hasil Diharapkan</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-01 terverifikasi" /></td><td class="id num">TC-01</td><td><span class="badge b-outline">Engine</span></td><td class="scen">Jurnal debit ≠ kredit</td><td class="exp">Ditolak dengan pesan selisih</td><td><span class="badge b-success">Lulus</span></td></tr>
+              <tr><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-02 terverifikasi" /></td><td class="id num">TC-02</td><td><span class="badge b-outline">Engine</span></td><td class="scen">Baris jurnal &lt; 2 atau nilai negatif</td><td class="exp">Ditolak sebelum tersimpan</td><td><span class="badge b-success">Lulus</span></td></tr>
+              <tr><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-03 terverifikasi" /></td><td class="id num">TC-03</td><td><span class="badge b-outline">Penjualan</span></td><td class="scen">Void faktur tanpa pembayaran</td><td class="exp">Jurnal reversal + stok kembali</td><td><span class="badge b-success">Lulus</span></td></tr>
+              <tr><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-04 terverifikasi" /></td><td class="id num">TC-04</td><td><span class="badge b-outline">Penjualan</span></td><td class="scen">Void faktur yang sudah dibayar</td><td class="exp">Ditolak — gunakan jurnal koreksi</td><td><span class="badge b-success">Lulus</span></td></tr>
+              <tr><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-05 terverifikasi" /></td><td class="id num">TC-05</td><td><span class="badge b-outline">Penjualan</span></td><td class="scen">Penerimaan melebihi sisa tagihan</td><td class="exp">Ditolak dengan nominal sisa</td><td><span class="badge b-success">Lulus</span></td></tr>
+              <tr><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-06 terverifikasi" /></td><td class="id num">TC-06</td><td><span class="badge b-outline">Retur</span></td><td class="scen">Qty retur melebihi sisa</td><td class="exp">Ditolak + info sisa per unit</td><td><span class="badge b-success">Lulus</span></td></tr>
+              <tr><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-07 terverifikasi" /></td><td class="id num">TC-07</td><td><span class="badge b-outline">Retur</span></td><td class="scen">Retur dengan restock</td><td class="exp">Stok masuk gudang + HPP dibalik</td><td><span class="badge b-success">Lulus</span></td></tr>
+              <tr><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-08 terverifikasi" /></td><td class="id num">TC-08</td><td><span class="badge b-outline">Pembelian</span></td><td class="scen">Faktur baru memutakhirkan HPP</td><td class="exp">Biaya rata-rata bergerak diperbarui</td><td><span class="badge b-success">Lulus</span></td></tr>
+              <tr><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-09 terverifikasi" /></td><td class="id num">TC-09</td><td><span class="badge b-outline">Kasir POS</span></td><td class="scen">Uang diterima kurang dari total</td><td class="exp">Ditolak</td><td><span class="badge b-success">Lulus</span></td></tr>
+              <tr><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-10 terverifikasi" /></td><td class="id num">TC-10</td><td><span class="badge b-outline">Kasir POS</span></td><td class="scen">Kembalian via metode non-tunai</td><td class="exp">Ditolak — hanya lewat Cash</td><td><span class="badge b-success">Lulus</span></td></tr>
+              <tr class="gap"><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-11 terverifikasi" /></td><td class="id num">TC-11</td><td><span class="badge b-outline">Kasir POS</span></td><td class="scen">Penjualan melebihi stok tersedia</td><td class="exp">Saat ini diterima (stok minus) → perlu validasi</td><td><span class="badge b-danger">Gap → P0</span></td></tr>
+              <tr><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-12 terverifikasi" /></td><td class="id num">TC-12</td><td><span class="badge b-outline">Persediaan</span></td><td class="scen">Opname dengan selisih</td><td class="exp">Jurnal Selisih Persediaan otomatis</td><td><span class="badge b-success">Lulus</span></td></tr>
+              <tr><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-13 terverifikasi" /></td><td class="id num">TC-13</td><td><span class="badge b-outline">Persediaan</span></td><td class="scen">Opname tanpa selisih / hitung negatif</td><td class="exp">Ditolak</td><td><span class="badge b-success">Lulus</span></td></tr>
+              <tr><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-14 terverifikasi" /></td><td class="id num">TC-14</td><td><span class="badge b-outline">Aset Tetap</span></td><td class="scen">Penyusutan ulang di bulan sama</td><td class="exp">Idempoten — bulan terproses dilewati</td><td><span class="badge b-success">Lulus</span></td></tr>
+              <tr><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-15 terverifikasi" /></td><td class="id num">TC-15</td><td><span class="badge b-outline">Aset Tetap</span></td><td class="scen">Disposal di atas / bawah nilai buku</td><td class="exp">Laba → Pendapatan Lain; Rugi → Rugi Jual Aset</td><td><span class="badge b-success">Lulus</span></td></tr>
+              <tr><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-16 terverifikasi" /></td><td class="id num">TC-16</td><td><span class="badge b-outline">Kas &amp; Bank</span></td><td class="scen">Transfer ke rekening yang sama</td><td class="exp">Ditolak</td><td><span class="badge b-success">Lulus</span></td></tr>
+              <tr><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-17 terverifikasi" /></td><td class="id num">TC-17</td><td><span class="badge b-outline">Laporan</span></td><td class="scen">Aging 14/15/30/31, clamp negatif, pembayaran parsial</td><td class="exp">Bucket benar — unit test 7/7</td><td><span class="badge b-success">Lulus</span></td></tr>
+              <tr><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-18 terverifikasi" /></td><td class="id num">TC-18</td><td><span class="badge b-outline">Laporan</span></td><td class="scen">Neraca seimbang &amp; PPN payable pada data riil</td><td class="exp">Verifikasi visual di halaman Laporan</td><td><span class="badge b-warning">Uji manual</span></td></tr>
+              <tr><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-19 terverifikasi" /></td><td class="id num">TC-19</td><td><span class="badge b-outline">Multi-tenant</span></td><td class="scen">Data perusahaan lain tidak bocor</td><td class="exp">Semua query difilter companyId</td><td><span class="badge b-success">Lulus</span></td></tr>
+              <tr><td><input type="checkbox" class="qa-check" aria-label="Tandai TC-20 terverifikasi" /></td><td class="id num">TC-20</td><td><span class="badge b-outline">UI</span></td><td class="scen">Export CSV &amp; cetak semua laporan</td><td class="exp">Uji manual per tab laporan</td><td><span class="badge b-warning">Uji manual</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="qa-foot">
+          Centang hanya tersimpan selama sesi halaman ini (data statis, tanpa backend) — pakai sebagai checklist saat uji manual.
+          Status “Lulus” berdasarkan guard backend &amp; unit test aging; temuan otomatis masuk backlog P0.
+        </p>
+      </div>
+
+      <p class="snapshot-note">
+        Snapshot statis dari <strong>Pengaturan → Backlog &amp; QA</strong> · POS GG Online —
+        versi aplikasi lengkap (dengan data live) tersedia di <a href="/">preview utama</a>.
+      </p>
+    </main>
+
+    <script>
+      const boxes = document.querySelectorAll(".qa-check");
+      const counter = document.getElementById("qa-counter");
+      const bar = document.getElementById("qa-bar");
+      function updateMeter() {
+        const checked = Array.from(boxes).filter((b) => b.checked).length;
+        counter.textContent = checked + "/" + boxes.length;
+        bar.style.width = Math.round((checked / boxes.length) * 100) + "%";
+      }
+      boxes.forEach((b) => b.addEventListener("change", updateMeter));
+    </script>
+  </body>
+</html>
