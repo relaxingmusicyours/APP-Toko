@@ -189,7 +189,8 @@ export function AppShell() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="truncate text-sm font-bold">
-                    {me?.company?.name ?? "Memuat perusahaan…"}
+                    {me?.company?.name ??
+                      (me === undefined ? "Memuat perusahaan…" : "Menyiapkan workspace…")}
                   </span>
                   <Badge variant="lime" className="hidden sm:inline-flex">
                     Aktif

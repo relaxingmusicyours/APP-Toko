@@ -103,9 +103,11 @@ export const ensureCompany = mutation({
     }
 
     const user = await ctx.db.get(uid);
+    // Nama dari form pendaftaran dipakai apa adanya (mis. "Toko Berkah Jaya").
+    const registeredName = (user?.name ?? "").trim();
     const companyId = await ctx.db.insert("companies", {
       ownerId: uid,
-      name: user?.name ? `Toko ${user.name}` : "Toko GG Online",
+      name: registeredName || "Toko GG Online",
       seeded: true,
     });
 

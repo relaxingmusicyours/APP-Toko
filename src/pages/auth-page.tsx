@@ -1,10 +1,12 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth } from "@convex-dev/auth/react";
+import { useConvex } from "convex/react";
 import { motion } from "framer-motion";
 import { AlertTriangle, ArrowRight, BadgeCheck, BookOpenCheck, Lock, ShieldCheck, Sparkles } from "lucide-react";
 import * as React from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/misc";
@@ -31,6 +33,29 @@ export default function AuthPage() {
   const [password, setPassword] = React.useState("");
   const [pending, setPending] = React.useState(false);
   const convexStatus = React.useMemo(() => getConvexStatus(), []);
+  const convex = useConvex();
+  const [backendState, setBackendState] = React.useState<"checking" | "ok" | "error">(
+    "checking",
+  );
+
+  // Pemeriksaan kesehatan backend: panggil fungsi yang pasti ada di kode ini.
+  // Gagal = deployment belum terjangkau atau fungsinya belum di-deploy.
+  React.useEffect(() => {
+    let active = true;
+    convex.query(api.company.me).then(
+      () => {
+        if (active) setBackendState("ok");
+      },
+      () => {
+        if (active) setBackendState("error");
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [convex]);
+
+  const backendBlocked = convexStatus.unreachable || backendState === "error";
 
   if (!isLoading && isAuthenticated) {
     return <Navigate to={returnTo} replace />;
@@ -38,8 +63,8 @@ export default function AuthPage() {
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (convexStatus.unreachable) {
-      toast.error("Backend belum terhubung — lihat petunjuk di atas form");
+    if (backendBlocked) {
+      toast.error("Backend belum siap — lihat petunjuk di atas form");
       return;
     }
     setPending(true);
@@ -123,25 +148,41 @@ export default function AuthPage() {
             </p>
           </div>
 
-          {convexStatus.unreachable ? (
+          {backendBlocked ? (
             <div className="mb-5 rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-400/30 dark:bg-amber-400/10">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
                 <div className="text-sm">
-                  <p className="font-bold">Backend belum terhubung</p>
+                  <p className="font-bold">
+                    {convexStatus.unreachable
+                      ? "Backend belum terhubung"
+                      : "Fungsi backend belum tersedia"}
+                  </p>
                   <p className="mt-1 text-muted-foreground">
-                    Masuk dan Daftar membutuhkan database Convex. Alamat backend saat ini masih
-                    mengarah ke localhost, sehingga permintaan dari browser akan gagal.
+                    {convexStatus.unreachable
+                      ? "Masuk dan Daftar membutuhkan database Convex. Alamat backend saat ini masih mengarah ke localhost, sehingga permintaan dari browser akan gagal."
+                      : "Deployment Convex sudah dapat dijangkau, tetapi fungsi-fungsi aplikasi belum di-deploy ke sana. Masuk dan Daftar akan gagal sampai kode di-push."}
                   </p>
                   <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs text-muted-foreground">
-                    <li>
-                      Jalankan <code className="num">npx convex login</code> lalu{" "}
-                      <code className="num">npx convex dev --once</code> di terminal workspace.
-                    </li>
-                    <li>
-                      Isi <strong>CONVEX_DEPLOYMENT</strong>, <strong>VITE_CONVEX_URL</strong>, dan{" "}
-                      <strong>CONVEX_ADMIN_KEY</strong> di Settings, lalu Environment.
-                    </li>
+                    {convexStatus.unreachable ? (
+                      <>
+                        <li>
+                          Jalankan <code className="num">npx convex login</code> lalu{" "}
+                          <code className="num">npx convex dev --once</code> di terminal workspace.
+                        </li>
+                        <li>
+                          Isi <strong>CONVEX_DEPLOYMENT</strong>,{" "}
+                          <strong>VITE_CONVEX_URL</strong>, dan{" "}
+                          <strong>CONVEX_ADMIN_KEY</strong> di Settings, lalu Environment.
+                        </li>
+                      </>
+                    ) : (
+                      <li>
+                        Push kode ke deployment ini, dengan <code className="num">bun convex dev --once</code>
+                        {" "}di terminal workspace, atau isi <strong>CONVEX_ADMIN_KEY</strong> di
+                        Settings, lalu Environment agar saya bisa push.
+                      </li>
+                    )}
                     <li>Minta saya push fungsi, lalu uji daftar dan masuk dari ujung ke ujung.</li>
                   </ol>
                   <p className="mt-2 text-xs text-muted-foreground">

@@ -1,0 +1,40 @@
+name: Deploy Convex
+
+# Menjalankan 'bunx convex deploy' setiap push ke main:
+# kode di src/convex/ otomatis ter-deploy ke deployment Convex
+# grateful-dolphin-835 (dev), ditentukan oleh CONVEX_DEPLOY_KEY.
+# Folder fungsi dibaca dari convex.json ("functions": "src/convex/"),
+# jadi workflow ini aman meski folder fungsi tidak di ./convex.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: convex-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Push functions to Convex
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Deploy functions to Convex
+        run: bunx convex deploy --typecheck disable
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}

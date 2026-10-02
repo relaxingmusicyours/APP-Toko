@@ -1,4 +1,4 @@
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import {
   AlertTriangle,
   ArrowDownRight,
@@ -46,12 +46,37 @@ export default function Dashboard() {
     from: monthStartISO(month),
     to: monthEndISO(month),
   });
+  const ensureCompany = useMutation(api.company.ensureCompany);
+  const [setupError, setSetupError] = React.useState<string | null>(null);
+
+  const setupWorkspace = async () => {
+    try {
+      await ensureCompany({});
+      setSetupError(null);
+    } catch (err) {
+      setSetupError(err instanceof Error ? err.message : String(err));
+    }
+  };
 
   if (dashboard === undefined || profitLoss === undefined) {
     return <Loading label="Menyiapkan dashboard…" />;
   }
   if (!dashboard) {
-    return <EmptyState title="Workspace belum siap" description="Muat ulang halaman." />;
+    return (
+      <EmptyState
+        title="Workspace belum siap"
+        description={
+          setupError
+            ? `Inisialisasi gagal: ${setupError}`
+            : "Data perusahaan belum dibuat. Jalankan inisialisasi workspace untuk mengisi COA, master data, dan saldo awal."
+        }
+        action={
+          <Button variant="accent" onClick={() => void setupWorkspace()}>
+            Siapkan workspace
+          </Button>
+        }
+      />
+    );
   }
 
   const aging = dashboard.recentInvoices
