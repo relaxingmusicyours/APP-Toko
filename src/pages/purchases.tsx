@@ -21,6 +21,7 @@ import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { EmptyState, Loading, PageHeader, Stat, Tabs } from "@/components/ui/misc";
 import { Table, TBody, TD, TH, THead, TR, TableWrap } from "@/components/ui/table";
 import { downloadCSV, errorMessage, formatDate, formatIDR, todayISO } from "@/lib/utils";
+import { useViewTarget } from "@/lib/view-target";
 
 interface LineDraft {
   itemId: string;
@@ -38,6 +39,11 @@ export default function Purchases() {
   const voidBill = useMutation(api.purchases.voidBill);
 
   const [tab, setTab] = React.useState("all");
+  // Dipicu dari pop-up pemilihan dokumen di sidebar.
+  useViewTarget((view) => {
+    if (view === "form") openForm();
+    else if (view === "all" || view === "posted" || view === "paid") setTab(view);
+  });
   const [detailId, setDetailId] = React.useState<Id<"purchaseBills"> | null>(null);
   const [formOpen, setFormOpen] = React.useState(false);
   const [payTarget, setPayTarget] = React.useState<{ id: Id<"purchaseBills">; remaining: number; number: string } | null>(null);

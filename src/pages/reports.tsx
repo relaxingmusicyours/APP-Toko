@@ -30,6 +30,7 @@ import {
   monthEndISO,
   monthStartISO,
 } from "@/lib/utils";
+import { useViewTarget } from "@/lib/view-target";
 
 const REPORTS = [
   { value: "neraca", label: "Neraca" },
@@ -50,6 +51,10 @@ type ReportTab = (typeof REPORTS)[number]["value"];
 export default function Reports() {
   const month = currentMonthISO();
   const [tab, setTab] = React.useState<ReportTab>("neraca");
+  // Dipicu dari pop-up pemilihan dokumen di sidebar.
+  useViewTarget((view) => {
+    if (REPORTS.some((report) => report.value === view)) setTab(view as ReportTab);
+  });
   const [from, setFrom] = React.useState(monthStartISO(month));
   const [to, setTo] = React.useState(monthEndISO(month));
 

@@ -1,8 +1,8 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
-import { mutation, query } from "./_generated/server";
-import { applyStockMove, logAudit, postJournal } from "./lib/posting";
+import type { Id, TableNames } from "./_generated/dataModel";
+import { mutation, query, type MutationCtx } from "./_generated/server";
+import { logAudit } from "./lib/posting";
 
 const COA_SEED: Array<{
   code: string;
@@ -30,27 +30,6 @@ const COA_SEED: Array<{
   { code: "5-5500", name: "Selisih Persediaan", type: "expense", kind: "other" },
   { code: "5-5600", name: "Beban Penyusutan", type: "expense", kind: "depreciation" },
   { code: "5-5700", name: "Rugi Penjualan Aset", type: "expense", kind: "asset_disposal" },
-];
-
-const ITEM_SEED = [
-  { sku: "SKU-001", name: "Kopi Susu GG Botol 250ml", category: "Minuman", unit: "pcs", salePrice: 15000, costPrice: 9000, taxRate: 11, trackStock: true, minStock: 12, opening: 60 },
-  { sku: "SKU-002", name: "Air Mineral 600ml", category: "Minuman", unit: "pcs", salePrice: 5000, costPrice: 3000, taxRate: 11, trackStock: true, minStock: 24, opening: 96 },
-  { sku: "SKU-003", name: "Roti Bakar Frozen", category: "Makanan", unit: "pcs", salePrice: 12000, costPrice: 7500, taxRate: 11, trackStock: true, minStock: 10, opening: 40 },
-  { sku: "SKU-004", name: "Keripik Singkong GG", category: "Makanan", unit: "pcs", salePrice: 18000, costPrice: 11000, taxRate: 11, trackStock: true, minStock: 10, opening: 50 },
-  { sku: "SKU-005", name: "Gula Pasir 1kg", category: "Sembako", unit: "kg", salePrice: 17000, costPrice: 14500, taxRate: 11, trackStock: true, minStock: 8, opening: 32 },
-  { sku: "SKU-006", name: "Beras Premium 5kg", category: "Sembako", unit: "karung", salePrice: 78000, costPrice: 68000, taxRate: 11, trackStock: true, minStock: 5, opening: 20 },
-  { sku: "SKU-007", name: "Jasa Antar & Instalasi", category: "Jasa", unit: "job", salePrice: 50000, costPrice: 0, taxRate: 11, trackStock: false, minStock: 0, opening: 0 },
-];
-
-const CUSTOMER_SEED = [
-  { code: "C-001", name: "Budi Santoso", phone: "0812-1111-2222", email: "budi@example.com", address: "Jl. Merdeka 12, Bandung" },
-  { code: "C-002", name: "Warung Mekar Sari", phone: "0813-3333-4444", email: "mekar@example.com", address: "Jl. Pasar Baru 8, Bandung" },
-  { code: "C-003", name: "PT Maju Jaya Abadi", phone: "022-7778888", email: "finance@majujaya.co.id", address: "Gedung Wisma Lantai 4, Jakarta" },
-];
-
-const SUPPLIER_SEED = [
-  { code: "S-001", name: "PT Distribusi Nusantara", phone: "021-5551234", email: "sales@distnusantara.co.id", address: "Kawasan Industri Pulogadung, Jakarta" },
-  { code: "S-002", name: "CV Sumber Pangan Lestari", phone: "022-4449876", email: "order@sumberpangan.id", address: "Jl. Soekarno Hatta 210, Bandung" },
 ];
 
 export function todayISO(): string {
@@ -83,138 +62,168 @@ async function ensureSystemAccounts(ctx: any, companyId: Id<"companies">) {
 }
 
 /**
- * Idempotent bootstrap: creates the tenant company, chart of accounts,
- * master data, and opening balances for a freshly signed-up user.
+ * Pastikan akun pemilik terdaftar sebagai anggota tim (peran "owner") supaya
+ * menu Pengguna langsung menampilkan dia. Idempotent.
  */
+async function ensureOwnerMemberRow(
+  ctx: MutationCtx,
+  companyId: Id<"companies">,
+  uid: Id<"users">,
+) {
+  const user = await ctx.db.get(uid);
+  const email = (user?.email ?? "").trim().toLowerCase();
+  if (!email) return;
+  const existing = await ctx.db
+    .query("companyMembers")
+    .withIndex("by_company_email", (q) => q.eq("companyId", companyId).eq("email", email))
+    .first();
+  if (existing) return;
+  await ctx.db.insert("companyMembers", {
+    companyId,
+    userId: uid,
+    email,
+    name: user?.name || "Pemilik",
+    role: "owner",
+    status: "active",
+    invitedAt: Date.now(),
+  });
+}
+
+/**
+ * Idempotent bootstrap: membuat tenant + Chart of Accounts sistem + satu gudang
+ * default. Master data (pelanggan, pemasok, barang) dan saldo awal sengaja
+ * TIDAK dibuat — workspace baru mulai kosong dan diisi pengguna sendiri lewat
+ * menu Master Data (dibantu tutorial di sisi frontend).
+ */
+async function bootstrapCompany(ctx: MutationCtx, uid: Id<"users">): Promise<Id<"companies">> {
+  const existing = await ctx.db
+    .query("companies")
+    .withIndex("by_owner", (q) => q.eq("ownerId", uid))
+    .first();
+  if (existing) {
+    await ensureSystemAccounts(ctx, existing._id);
+    await ensureOwnerMemberRow(ctx, existing._id, uid);
+    return existing._id;
+  }
+
+  const user = await ctx.db.get(uid);
+  // Nama dari form pendaftaran dipakai apa adanya (mis. "Toko Berkah Jaya").
+  const registeredName = (user?.name ?? "").trim();
+  const companyId = await ctx.db.insert("companies", {
+    ownerId: uid,
+    name: registeredName || "Toko GG Online",
+    seeded: true,
+  });
+
+  // Chart of accounts sistem — satu-satunya data bawaan.
+  for (const acc of COA_SEED) {
+    await ctx.db.insert("accounts", {
+      companyId,
+      code: acc.code,
+      name: acc.name,
+      type: acc.type,
+      kind: acc.kind,
+      isSystem: true,
+      isActive: true,
+    });
+  }
+
+  // Satu gudang default supaya kasir & pembelian langsung bisa jalan.
+  await ctx.db.insert("warehouses", {
+    companyId,
+    code: "WH-01",
+    name: "Gudang Utama",
+  });
+
+  await ensureOwnerMemberRow(ctx, companyId, uid);
+
+  await logAudit(ctx, {
+    companyId,
+    userId: uid,
+    action: "CREATE",
+    entity: "Perusahaan",
+    detail: "Inisialisasi tenant kosong dengan Chart of Accounts sistem dan Gudang Utama",
+  });
+
+  return companyId;
+}
+
+/**
+ * Mengosongkan database tenant: hapus seluruh transaksi, jurnal, dan master
+ * data. Chart of Accounts dan gudang tetap dipertahankan karena keduanya
+ * struktur wajib agar aplikasi tetap bisa dipakai.
+ */
+async function wipeBusinessData(ctx: MutationCtx, companyId: Id<"companies">) {
+  const clear = async (ids: Array<Id<TableNames>>) => {
+    for (const id of ids) await ctx.db.delete(id);
+  };
+  const mine = (rows: Array<{ _id: Id<TableNames>; companyId: Id<"companies"> }>) =>
+    rows.filter((row) => row.companyId === companyId).map((row) => row._id);
+
+  // Baris anak dihapus lebih dulu agar tidak menggantung.
+  await clear(mine(await ctx.db.query("salesInvoiceLines").collect()));
+  await clear(mine(await ctx.db.query("salesReturnLines").collect()));
+  await clear(mine(await ctx.db.query("purchaseBillLines").collect()));
+  await clear(mine(await ctx.db.query("journalLines").collect()));
+  await clear(mine(await ctx.db.query("salesReturns").collect()));
+  await clear(mine(await ctx.db.query("salesInvoices").collect()));
+  await clear(mine(await ctx.db.query("purchaseBills").collect()));
+  await clear(mine(await ctx.db.query("receipts").collect()));
+  await clear(mine(await ctx.db.query("payments").collect()));
+  await clear(mine(await ctx.db.query("cashTransactions").collect()));
+  await clear(mine(await ctx.db.query("journalEntries").collect()));
+  await clear(mine(await ctx.db.query("stockMovements").collect()));
+  await clear(mine(await ctx.db.query("stockBalances").collect()));
+  await clear(mine(await ctx.db.query("fixedAssets").collect()));
+  await clear(mine(await ctx.db.query("items").collect()));
+  await clear(mine(await ctx.db.query("customers").collect()));
+  await clear(mine(await ctx.db.query("suppliers").collect()));
+  await clear(mine(await ctx.db.query("counters").collect()));
+  await clear(mine(await ctx.db.query("auditLogs").collect()));
+}
+
 export const ensureCompany = mutation({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new ConvexError("Belum masuk");
+    return await bootstrapCompany(ctx, userId as Id<"users">);
+  },
+});
+
+/** Menghapus semua data bisnis tenant; dipakai tombol "Kosongkan database". */
+export const clearWorkspace = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new ConvexError("Belum masuk");
     const uid = userId as Id<"users">;
-
-    const existing = await ctx.db
-      .query("companies")
-      .withIndex("by_owner", (q) => q.eq("ownerId", uid))
-      .first();
-    if (existing) {
-      await ensureSystemAccounts(ctx, existing._id);
-      return existing._id;
-    }
-
-    const user = await ctx.db.get(uid);
-    // Nama dari form pendaftaran dipakai apa adanya (mis. "Toko Berkah Jaya").
-    const registeredName = (user?.name ?? "").trim();
-    const companyId = await ctx.db.insert("companies", {
-      ownerId: uid,
-      name: registeredName || "Toko GG Online",
-      seeded: true,
-    });
-
-    // Chart of accounts
-    const accountIds: Record<string, Id<"accounts">> = {};
-    for (const acc of COA_SEED) {
-      const id = await ctx.db.insert("accounts", {
-        companyId,
-        code: acc.code,
-        name: acc.name,
-        type: acc.type,
-        kind: acc.kind,
-        isSystem: true,
-        isActive: true,
-      });
-      accountIds[acc.kind] = id;
-      if (acc.code === "1-1000") accountIds.cash = id;
-      if (acc.code === "1-1010") accountIds.bank = id;
-      if (acc.code === "1-1100") accountIds.receivable = id;
-      if (acc.code === "1-1200") accountIds.inventory = id;
-      if (acc.code === "1-1300") accountIds.tax_in = id;
-      if (acc.code === "2-2000") accountIds.payable = id;
-      if (acc.code === "2-2100") accountIds.tax_out = id;
-      if (acc.code === "3-3000") accountIds.equity = id;
-      if (acc.code === "4-4000") accountIds.sales = id;
-      if (acc.code === "5-5000") accountIds.cogs = id;
-    }
-
-    const warehouseId = await ctx.db.insert("warehouses", {
-      companyId,
-      code: "WH-01",
-      name: "Gudang Utama",
-      location: "Bandung",
-    });
-
-    // Master data
-    for (const c of CUSTOMER_SEED) {
-      await ctx.db.insert("customers", { companyId, ...c, isActive: true });
-    }
-    for (const s of SUPPLIER_SEED) {
-      await ctx.db.insert("suppliers", { companyId, ...s, isActive: true });
-    }
-
-    // Items + opening stock
-    let inventoryValue = 0;
-    for (const item of ITEM_SEED) {
-      const itemId = await ctx.db.insert("items", {
-        companyId,
-        sku: item.sku,
-        name: item.name,
-        category: item.category,
-        unit: item.unit,
-        salePrice: item.salePrice,
-        costPrice: item.costPrice,
-        taxRate: item.taxRate,
-        trackStock: item.trackStock,
-        minStock: item.minStock,
-        isActive: true,
-      });
-      if (item.trackStock && item.opening > 0) {
-        await applyStockMove(ctx, {
-          companyId,
-          itemId,
-          warehouseId,
-          date: todayISO(),
-          qty: item.opening,
-          unitCost: item.costPrice,
-          refType: "OPENING",
-          refNumber: "SALDO-AWAL",
-          note: "Saldo awal persediaan",
-        });
-        inventoryValue += item.opening * item.costPrice;
-      }
-    }
-
-    // Opening balances: cash 5jt, bank 25jt, inventory, funded by equity
-    const openingCash = 5_000_000;
-    const openingBank = 25_000_000;
-    await postJournal(ctx, {
-      companyId,
-      date: todayISO(),
-      memo: "Saldo awal perusahaan",
-      sourceType: "OPENING",
-      sourceNumber: "SALDO-AWAL",
-      userId: uid,
-      lines: [
-        { accountId: accountIds.cash, debit: openingCash, credit: 0 },
-        { accountId: accountIds.bank, debit: openingBank, credit: 0 },
-        { accountId: accountIds.inventory, debit: inventoryValue, credit: 0 },
-        {
-          accountId: accountIds.equity,
-          debit: 0,
-          credit: openingCash + openingBank + inventoryValue,
-        },
-      ],
-    });
-
+    const companyId = await bootstrapCompany(ctx, uid);
+    await wipeBusinessData(ctx, companyId);
     await logAudit(ctx, {
       companyId,
       userId: uid,
-      action: "CREATE",
-      entity: "Perusahaan",
-      entityNumber: "SALDO-AWAL",
-      detail: "Inisialisasi tenant, COA, master data dan saldo awal",
+      action: "DELETE",
+      entity: "Database",
+      detail: "Seluruh data bisnis dihapus (COA dan gudang tetap ada)",
     });
-
     return companyId;
+  },
+});
+
+/**
+ * Dipanggil setelah login akun demo: memastikan workspace ada, lalu
+ * mengosongkan database sehingga setiap sesi demo mulai dari nol.
+ */
+export const prepareDemo = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new ConvexError("Belum masuk");
+    const uid = userId as Id<"users">;
+    const companyId = await bootstrapCompany(ctx, uid);
+    await wipeBusinessData(ctx, companyId);
+    return { companyId, cleared: true };
   },
 });
 

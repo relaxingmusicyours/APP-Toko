@@ -10,6 +10,7 @@ import {
   LogOut,
   Menu,
   Package,
+  PlayCircle,
   Receipt,
   ScrollText,
   Settings,
@@ -24,11 +25,35 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import { api } from "@/convex/_generated/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
+import { InventoryMenu } from "@/components/inventory-menu";
+import {
+  handleTile,
+  MODULE_TITLES,
+  ModuleMenu,
+  type ModuleId,
+} from "@/components/module-menu";
+import { SalesMenu } from "@/components/sales-menu";
+import { launchTutorial } from "@/components/tutorial";
 import { cn } from "@/lib/utils";
+
+/** Menu yang dibuka lewat pop-up pemilihan dokumen, bukan navigasi langsung. */
+type LauncherId = "penjualan" | "persediaan" | ModuleId;
+
+const LAUNCHER_TITLES: Record<LauncherId, string> = {
+  penjualan: "Penjualan",
+  persediaan: "Persediaan",
+  ...MODULE_TITLES,
+};
 
 const NAV_GROUPS: Array<{
   label: string;
-  items: Array<{ to: string; label: string; icon: React.ComponentType<{ className?: string }> }>;
+  items: Array<{
+    to: string;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    popup?: LauncherId;
+  }>;
 }> = [
   {
     label: "Ringkasan",
@@ -37,26 +62,26 @@ const NAV_GROUPS: Array<{
   {
     label: "Transaksi",
     items: [
-      { to: "/app/pos", label: "Kasir POS", icon: ShoppingCart },
-      { to: "/app/penjualan", label: "Penjualan", icon: Receipt },
-      { to: "/app/pembelian", label: "Pembelian", icon: Truck },
-      { to: "/app/persediaan", label: "Persediaan", icon: Boxes },
-      { to: "/app/aset-tetap", label: "Aset Tetap", icon: Building2 },
+      { to: "/app/pos", label: "Kasir POS", icon: ShoppingCart, popup: "kasir" },
+      { to: "/app/penjualan", label: "Penjualan", icon: Receipt, popup: "penjualan" },
+      { to: "/app/pembelian", label: "Pembelian", icon: Truck, popup: "pembelian" },
+      { to: "/app/persediaan", label: "Persediaan", icon: Boxes, popup: "persediaan" },
+      { to: "/app/aset-tetap", label: "Aset Tetap", icon: Building2, popup: "aset-tetap" },
     ],
   },
   {
     label: "Akuntansi",
     items: [
-      { to: "/app/buku-besar", label: "Buku Besar", icon: ScrollText },
-      { to: "/app/kas-bank", label: "Kas & Bank", icon: Wallet },
-      { to: "/app/laporan", label: "Laporan", icon: BarChart3 },
+      { to: "/app/buku-besar", label: "Buku Besar", icon: ScrollText, popup: "buku-besar" },
+      { to: "/app/kas-bank", label: "Kas & Bank", icon: Wallet, popup: "kas-bank" },
+      { to: "/app/laporan", label: "Laporan", icon: BarChart3, popup: "laporan" },
     ],
   },
   {
     label: "Data & Sistem",
     items: [
-      { to: "/app/master-data", label: "Master Data", icon: Package },
-      { to: "/app/pengaturan", label: "Pengaturan", icon: Settings },
+      { to: "/app/master-data", label: "Master Data", icon: Package, popup: "master-data" },
+      { to: "/app/pengaturan", label: "Pengaturan", icon: Settings, popup: "pengaturan" },
     ],
   },
 ];
@@ -77,11 +102,39 @@ function Brand({ compact }: { compact?: boolean }) {
   );
 }
 
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+/** Tooltip nama menu yang muncul saat ikon di sidebar di-hover / di-fokus. */
+function RailTip({ label }: { label: string }) {
   return (
-    <div className="flex h-full flex-col gap-6 overflow-y-auto scroll-thin bg-navy-900 p-4">
+    <span
+      role="tooltip"
+      className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-navy-950 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+    >
+      {label}
+    </span>
+  );
+}
+
+function SidebarContent({
+  onNavigate,
+  onOpenMenu,
+  compact,
+  pathname,
+}: {
+  onNavigate?: () => void;
+  onOpenMenu?: (id: LauncherId) => void;
+  /** true = rail ikon saja (desktop), false = daftar lengkap (drawer HP). */
+  compact?: boolean;
+  pathname: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex h-full flex-col gap-6 bg-navy-900",
+        compact ? "p-3" : "overflow-y-auto p-4 scroll-thin",
+      )}
+    >
       <div className="flex items-center justify-between">
-        <Brand />
+        <Brand compact={compact} />
         {onNavigate ? (
           <button
             onClick={onNavigate}
@@ -96,45 +149,112 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <nav className="flex flex-1 flex-col gap-5">
         {NAV_GROUPS.map((group) => (
           <div key={group.label} className="flex flex-col gap-1">
-            <span className="px-3 text-[10px] font-bold uppercase tracking-widest text-white/35">
-              {group.label}
-            </span>
-            {group.items.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === "/app"}
-                onClick={onNavigate}
-                className={({ isActive }) =>
-                  cn(
-                    "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-white/10 text-white shadow-inner"
-                      : "text-white/60 hover:bg-white/5 hover:text-white",
-                  )
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <item.icon
-                      className={cn("h-4 w-4", isActive ? "text-gg-lime" : "text-white/50")}
-                    />
-                    {item.label}
-                  </>
-                )}
-              </NavLink>
-            ))}
+            {compact ? (
+              <div className="mx-2 h-px bg-white/10" aria-hidden="true" />
+            ) : (
+              <span className="px-3 text-[10px] font-bold uppercase tracking-widest text-white/35">
+                {group.label}
+              </span>
+            )}
+            {group.items.map((item) => {
+              const active = pathname === item.to || pathname.startsWith(`${item.to}/`);
+              const itemClass = cn(
+                "group relative flex items-center rounded-lg text-sm font-medium transition-colors",
+                compact ? "justify-center p-2.5" : "gap-3 px-3 py-2",
+                active
+                  ? "bg-white/10 text-white shadow-inner"
+                  : "text-white/60 hover:bg-white/5 hover:text-white",
+              );
+              const content = (
+                <>
+                  <item.icon
+                    className={cn(
+                      compact ? "h-5 w-5" : "h-4 w-4",
+                      active ? "text-gg-lime" : "text-white/50",
+                    )}
+                  />
+                  {compact ? <RailTip label={item.label} /> : <span>{item.label}</span>}
+                </>
+              );
+
+              // Menu dengan grid dokumen: klik membuka pop-up, bukan pindah halaman.
+              if (item.popup) {
+                return (
+                  <button
+                    key={item.to}
+                    type="button"
+                    aria-label={item.label}
+                    onClick={() => {
+                      onOpenMenu?.(item.popup!);
+                      onNavigate?.();
+                    }}
+                    className={itemClass}
+                  >
+                    {content}
+                  </button>
+                );
+              }
+
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === "/app"}
+                  onClick={onNavigate}
+                  aria-label={item.label}
+                  className={itemClass}
+                >
+                  {content}
+                </NavLink>
+              );
+            })}
           </div>
         ))}
       </nav>
-
-      <div className="rounded-xl bg-gradient-to-br from-gg-teal/20 to-gg-lime/10 p-3">
-        <div className="flex items-center gap-2 text-xs font-semibold text-white">
-          <Sparkles className="h-3.5 w-3.5 text-gg-lime" /> Blueprint Accurate-style
-        </div>
-        <p className="mt-1 text-[11px] leading-relaxed text-white/60">
-          Order-to-Cash, Procure-to-Pay, persediaan, dan double-entry dalam satu ledger.
-        </p>
+      <div className={cn("space-y-3", compact && "flex flex-col items-center gap-2")}>
+        <button
+          onClick={launchTutorial}
+          aria-label="Tutorial klik setiap menu"
+          className={cn(
+            "group relative rounded-xl border border-white/10 bg-white/5 text-left transition-colors hover:border-gg-lime/40 hover:bg-white/10",
+            compact ? "p-2.5" : "w-full p-3",
+          )}
+        >
+          {compact ? (
+            <>
+              <PlayCircle className="h-5 w-5 text-gg-lime" />
+              <RailTip label="Tutorial klik setiap menu" />
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 text-xs font-semibold text-white">
+                <PlayCircle className="h-3.5 w-3.5 text-gg-lime" />
+                Tutorial klik setiap menu
+              </div>
+              <p className="mt-1 text-[11px] leading-relaxed text-white/60">
+                Panduan langkah demi langkah, bisa dilewati kapan saja.
+              </p>
+            </>
+          )}
+        </button>
+        {compact ? (
+          <div className="group relative">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-gg-teal/20 to-gg-lime/10">
+              <Sparkles className="h-5 w-5 text-gg-lime" />
+            </span>
+            <RailTip label="Order-to-Cash, Procure-to-Pay, double-entry" />
+          </div>
+        ) : (
+          <div className="rounded-xl bg-gradient-to-br from-gg-teal/20 to-gg-lime/10 p-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-white">
+              <Sparkles className="h-3.5 w-3.5 text-gg-lime" />
+              Blueprint ERP-style
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-white/60">
+              Order-to-Cash, Procure-to-Pay, persediaan, dan double-entry dalam satu ledger.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -147,11 +267,18 @@ export function AppShell() {
   const me = useQuery(api.company.me);
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [launcher, setLauncher] = React.useState<LauncherId | null>(null);
 
   React.useEffect(() => {
     setMobileOpen(false);
     setMenuOpen(false);
   }, [location.pathname]);
+
+  /** Buka halaman tujuan sambil memberi tahu halaman itu apa yang harus dibuka. */
+  const openWith = (to: string, view?: string) => {
+    setLauncher(null);
+    navigate(to, view ? { state: { view } } : undefined);
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -160,9 +287,13 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <aside className="hidden w-64 shrink-0 lg:block">
-        <div className="fixed inset-y-0 left-0 w-64">
-          <SidebarContent />
+      <aside className="hidden w-[68px] shrink-0 lg:block">
+        <div className="fixed inset-y-0 left-0 w-[68px]">
+          <SidebarContent
+            compact
+            pathname={location.pathname}
+            onOpenMenu={(id) => setLauncher(id)}
+          />
         </div>
       </aside>
 
@@ -170,7 +301,11 @@ export function AppShell() {
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-navy-950/60" onClick={() => setMobileOpen(false)} />
           <div className="absolute inset-y-0 left-0 w-72">
-            <SidebarContent onNavigate={() => setMobileOpen(false)} />
+            <SidebarContent
+              onNavigate={() => setMobileOpen(false)}
+              onOpenMenu={(id) => setLauncher(id)}
+              pathname={location.pathname}
+            />
           </div>
         </div>
       ) : null}
@@ -256,7 +391,35 @@ export function AppShell() {
           </div>
         </main>
 
-        <footer className="border-t border-border px-4 py-4 text-xs text-muted-foreground sm:px-6">
+        {/* POP-UP PEMILIHAN DOKUMEN — halaman di bawahnya tetap di layar terakhir. */}
+      <Dialog
+        open={launcher !== null}
+        onClose={() => setLauncher(null)}
+        title={launcher ? LAUNCHER_TITLES[launcher] : ""}
+        description="Pilih dokumen yang ingin dikerjakan."
+        size="xl"
+      >
+        {launcher === "penjualan" ? (
+          <SalesMenu
+            onNewInvoice={() => openWith("/app/penjualan", "invoice")}
+            onShowReceipts={() => openWith("/app/penjualan", "posted")}
+            onShowReturns={() => openWith("/app/penjualan", "retur")}
+            onOpenCustomers={() => {
+              setLauncher(null);
+              navigate("/app/master-data");
+            }}
+          />
+        ) : launcher === "persediaan" ? (
+          <InventoryMenu
+            onSelect={(id) => openWith("/app/persediaan", id)}
+            onOpenOpname={() => openWith("/app/persediaan", "perintah-opname")}
+          />
+        ) : launcher ? (
+          <ModuleMenu module={launcher} onSelect={(tile) => handleTile(tile, openWith)} />
+        ) : null}
+      </Dialog>
+
+      <footer className="border-t border-border px-4 py-4 text-xs text-muted-foreground sm:px-6">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2">
             <span className="flex items-center gap-1.5">
               <Banknote className="h-3.5 w-3.5" /> POS GG Online — double-entry accounting engine

@@ -1,7 +1,7 @@
 # POS GG Online
 
 Kasir (POS), penjualan, pembelian, persediaan, dan akuntansi **double-entry** dalam satu aplikasi
-untuk bisnis Indonesia — dibangun mengikuti struktur modul ERP akuntansi (referensi: Accurate Online).
+untuk bisnis Indonesia — dibangun mengikuti struktur modul ERP akuntansi.
 
 ## Stack
 
@@ -15,7 +15,7 @@ untuk bisnis Indonesia — dibangun mengikuti struktur modul ERP akuntansi (refe
 | Modul | Isi |
 | --- | --- |
 | Kasir POS | Grid produk, keranjang, diskon, tunai/QRIS/transfer, kembalian, struk cetak |
-| Penjualan | Faktur (order-to-cash), penerimaan pembayaran, void + reversal, piutang |
+| Penjualan | Menu dokumen (penawaran → pesanan → pengiriman → uang muka → faktur → penerimaan → retur, plus dokumen khusus), faktur order-to-cash, penerimaan pembayaran, void + reversal, piutang |
 | Pembelian | Faktur pemasok (procure-to-pay), pembayaran, void, utang |
 | Persediaan | Multi-gudang, kartu stok (ledger), stok opname → jurnal selisih, stok minimum |
 | Aset Tetap | Register aset, perolehan berjurnal, penyusutan bulatan (garis lurus / saldo menurun), disposal + laba/rugi |
@@ -23,7 +23,114 @@ untuk bisnis Indonesia — dibangun mengikuti struktur modul ERP akuntansi (refe
 | Kas & Bank | Penerimaan, pengeluaran, transfer antar rekening |
 | Laporan | Neraca, Laba Rugi, Arus Kas, Trial Balance, AR/AP Aging, Penjualan per Pelanggan & per Produk, Pembelian per Pemasok, Ringkasan PPN, Register Aset — filter periode & export CSV |
 | Master Data | Pelanggan, pemasok, barang & jasa (biaya rata-rata bergerak), gudang |
-| Pengaturan | Profil perusahaan, COA tambahan, audit trail, roadmap, backlog P0–P2 & checklist QA (§26–§27) |
+| Pengaturan | Menu Alat (Preferensi, Akses Grup, Pengguna, Desain Cetakan), profil perusahaan, COA tambahan, audit trail, roadmap, backlog P0–P2 & checklist QA (§26–§27), kosongkan database |
+
+## Navigasi pop-up sidebar
+
+Ikon sidebar (kecuali Dashboard) tidak lagi membuka halaman secara langsung. Klik ikon → muncul
+pop-up berisi **kotak dokumen** untuk modul itu, dan halaman di bawahnya tetap di tampilan terakhir
+sampai kamu memilih salah satu kotak. Menutup pop-up tidak mengubah apa pun.
+
+Daftar tile tiap modul ada di satu tempat: `src/components/module-menu.tsx` (`MODULE_MENUS`), plus
+dua komponen khusus untuk Penjualan (`sales-menu.tsx`) dan Persediaan (`inventory-menu.tsx`).
+
+| Pop-up | Tile "Aktif" |
+| --- | --- |
+| Kasir POS | Faktur Kasir, Pelanggan di Kasir, Produk & Harga, Metode Pembayaran |
+| Pembelian | Faktur Pembelian, Pembayaran ke Suppliers, Riwayat, Pemasok |
+| Aset Tetap | Perolehan, Daftar Aset, Jadwal Penyusutan, Jalankan Penyusutan |
+| Buku Besar | Jurnal Umum, Buku per Akun, Chart of Accounts, Buat Jurnal Manual, Audit Trail |
+| Kas & Bank | Riwayat Transaksi, Transaksi Baru |
+| Laporan | 11 laporan (Neraca, Laba Rugi, Arus Kas, Trial, Aging, PPN, Register Aset, rekap penjualan/pembelian) |
+| Master Data | Pelanggan, Pemasok, Barang & Jasa, Gudang |
+| Pengaturan | Preferensi, Akses Grup, Pengguna, Desain Cetakan, Perusahaan, COA, Audit, Roadmap, Backlog, Integrasi |
+
+Kotak bertanda **Aktif** membuka halaman tujuan plus tampilan yang diminta (tab atau dialog),
+mis. "Faktur Pembelian" → `/app/pembelian` dengan form faktur terbuka. Kotak **Segera · V2/V3**
+menampilkan toast roadmap. Mekanismenya: `navigate(path, { state: { view } })` +
+hook `useViewTarget` (`src/lib/view-target.ts`) yang menjalankan aksi lalu membersihkan state.
+
+## Menu Alat (Pengaturan)
+
+`src/components/settings-tools.tsx` menampilkan grid 5 tile di atas halaman
+Pengaturan, persis seperti pada aplikasi pembanding:
+
+| Tile | Isi |
+| --- | --- |
+| **Preferensi** | Tahun buku, mata uang, format tanggal, PPN default, peringatan stok menipis |
+| **Akses Grup** | Ringkasan hak akses tiap peran (pemilik, manajer, kasir, pembukuan) + jumlah anggotanya |
+| **Pengguna** | Daftar anggota tim, status aktif/belum masuk, ubah status, hapus, dan undangan baru |
+| **Desain Cetakan** | Lebar struk (58/80 mm), footer, Kop, rincian PPN + pratinjau struk |
+| **Add On** | Katalog integrasi & add-on pihak ketiga — badge **Segera**, klik menampilkan toast roadmap V3 |
+
+Data disimpan di dua tempat: preferensi & desain cetakan pada tabel `companies`, anggota tim pada
+tabel `companyMembers` (backend: `src/convex/preferences.ts`). Hanya **pemilik** perusahaan yang
+bisa mengundang, menonaktifkan, atau menghapus anggota — akun pemilik sendiri tersimpan otomatis
+sebagai anggota peran `owner` dan tidak bisa dihapus. Semua perubahan tercatat di audit trail.
+
+## Menu Penjualan
+
+Halaman `/app/penjualan` membuka `src/components/sales-menu.tsx` — kumpulan dokumen penjualan
+berbentuk grid, dikelompokkan menurut warna:
+
+| Kelompok | Isi |
+| --- | --- |
+| **Transaksi Penjualan** (hijau) | Penawaran, Pesanan, Pengiriman, Uang Muka, Faktur, Penerimaan, Retur, Tukar Faktur, Klaim Pelanggan, Peng evidenced Barang |
+| **Data Pendukung** (biru) | Kategori Pelanggan, Kategori Penjualan, Pelanggan |
+| **Dokumen Khusus** (kuning) | Penyesuaian Harga/Diskon, Komisi Penjualan, Target Penjualan, SmartLink e-Commerce |
+
+Item yang alurnya sudah ada (Faktur, Penerimaan, Retur, Pelanggan) berlabel **Aktif** dan bisa
+diklik. Sisanya berlabel **Segera · V2/V3** sesuai tahapnya di roadmap `src/pages/settings.tsx`
+dan menampilkan toast singkat saat diklik — jadi menu ini jadi peta fitur tanpa navigasi yang
+buntu.
+
+## Menu Persediaan
+
+Halaman `/app/persediaan` membuka `src/components/inventory-menu.tsx` — grid dokumen
+persediaan dengan tiga kelompok warna:
+
+| Kelompok | Isi |
+| --- | --- |
+| **Aktif** (hijau) | Kartu Stok, Riwayat Pergerakan, Perintah Stock Opname, Hasil Stock Opname |
+| **Dokumen Persediaan** (kuning) | Pemindahan Barang, Penyesuaian Persediaan, Pekerjaan Pesanan, Pemindahan Bahan Baku, Penyesuaian Pesanan, Pengisian Nomor Seri |
+| **Referensi** (biru) | Referensi Barang, Kategori Barang, Satuan |
+
+Kotak yang alurnya sudah ada bisa diklik dan menggantikan tab "Kartu Stok" / "Riwayat Pergerakan";
+sisanya berlabel **Segera · V2/V3** dan menampilkan toast singkat. Kartu stok yang sedang
+dibuka ditandai cincin hijau.
+
+## Database kosong & akun demo
+
+Workspace baru **tidak** diisi data contoh. Saat pendaftaran, `ensureCompany` hanya membuat
+Chart of Accounts sistem dan satu **Gudang Utama**; seluruh master data (pelanggan, pemasok,
+barang) dan saldo awal kosong, lalu diisi pengguna sendiri lewat menu Master Data.
+
+Tiga cara mulai dari nol:
+
+| Cara | Perilaku |
+| --- | --- |
+| **Akun demo** (tombol di halaman masuk) | Masuk ke akun bersama, lalu database demo **dihapus** otomatis tiap sesi (`api.company.prepareDemo`) |
+| **Pengaturan → Kosongkan database** | Menghapus transaksi, jurnal, dan master data milik tenant; COA + Gudang Utama tetap ada (`api.company.clearWorkspace`) |
+| **Mode Demo tamu** (`/#/guest`) | Tidak menyentuh Convex sama sekali — data contoh statis di `src/lib/demo-data.ts` |
+
+## Tutorial klik setiap menu
+
+`src/components/tutorial.tsx` memandu pengguna menu demi menu (Dashboard, Master Data, Kasir,
+Penjualan, Pembelian, Persediaan, Aset Tetap, Kas & Bank, Buku Besar, Laporan, Pengaturan).
+Tiap langkah memindahkan halaman secara otomatis, menyebutkan tombol yang harus diklik, dan
+menampilkan tombol **Lewati tutorial** di setiap langkah. Status disimpan di `localStorage`
+(kunci `posgg:tutorial:v1`) supaya tidak muncul berulang; bisa diputar ulang dari sidebar atau
+**Pengaturan → Mulai tutorial**.
+
+## Env untuk integrasi GitHub (opsional)
+
+| Key | Keterangan |
+| --- | --- |
+| `GITHUB_TOKEN` | Token GitHub, dibaca di backend (Node runtime) untuk kartu status integrasi |
+| `GITHUB_REPOSITORY` | Format `owner/repo`, mis. `relaxingmusicyours/APP-Toko` |
+
+Tanpa key tersebut, kartu di **Pengaturan → Integrasi** tetap tampil dan menjelaskan fitur apa
+saja yang harus diaktifkan manual di GitHub.
 
 ## Accounting engine
 
@@ -97,4 +204,5 @@ Langkah pennyambungan:
 Selama belum terhubung, **Mode Demo** (`/#/guest`) tetap berfungsi penuh karena tidak memakai
 backend.
 
-Akun baru otomatis mendapat Chart of Accounts, master data contoh, dan saldo awal.
+Akun baru otomatis mendapat Chart of Accounts sistem dan satu Gudang Utama. Master data dan
+saldo awal sengaja dibiarkan kosong — isi sendiri lewat Master Data, atau ikuti tutorial.

@@ -1,8 +1,16 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth } from "@convex-dev/auth/react";
-import { useConvex } from "convex/react";
+import { useConvex, useMutation } from "convex/react";
 import { motion } from "framer-motion";
-import { AlertTriangle, ArrowRight, BadgeCheck, BookOpenCheck, Lock, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  BadgeCheck,
+  BookOpenCheck,
+  Lock,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 import * as React from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -19,6 +27,9 @@ const HIGHLIGHTS = [
   { icon: ShieldCheck, text: "Audit trail lengkap untuk tiap posting dan perubahan data" },
 ];
 
+const DEMO_EMAIL = "demo@posgg.id";
+const DEMO_PASSWORD = "demo1234";
+
 export default function AuthPage() {
   const { signIn } = useAuthActions();
   const { isAuthenticated, isLoading } = useConvexAuth();
@@ -32,8 +43,10 @@ export default function AuthPage() {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [pending, setPending] = React.useState(false);
+  const [demoPending, setDemoPending] = React.useState(false);
   const convexStatus = React.useMemo(() => getConvexStatus(), []);
   const convex = useConvex();
+  const prepareDemo = useMutation(api.company.prepareDemo);
   const [backendState, setBackendState] = React.useState<"checking" | "ok" | "error">(
     "checking",
   );
@@ -81,6 +94,56 @@ export default function AuthPage() {
       toast.error(errorMessage(error) || "Gagal masuk, periksa email dan kata sandi");
     } finally {
       setPending(false);
+    }
+  };
+
+  /**
+   * Masuk sebagai akun demo bersama. Database demo dikosongkan lebih dulu,
+   * jadi setiap orang yang memakai akun ini mulai dari kondisi yang sama:
+   * nol transaksi dan nol master data.
+   */
+  const startDemo = async () => {
+    if (backendBlocked) {
+      toast.error("Backend belum siap — lihat petunjuk di atas form");
+      return;
+    }
+    setDemoPending(true);
+    try {
+      // Akun demo dipakai bersama, jadi boleh Signing up ulang bila belum ada.
+      try {
+        await signIn("password", {
+          flow: "signIn",
+          email: DEMO_EMAIL,
+          password: DEMO_PASSWORD,
+        });
+      } catch {
+        await signIn("password", {
+          flow: "signUp",
+          email: DEMO_EMAIL,
+          password: DEMO_PASSWORD,
+          name: "Akun Demo POS GG",
+        });
+      }
+      // Sesi Convex menempel sedikit setelah signIn; coba beberapa kali.
+      let prepared = false;
+      let lastError: unknown = null;
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        try {
+          await prepareDemo({});
+          prepared = true;
+          break;
+        } catch (err) {
+          lastError = err;
+          await new Promise((resolve) => setTimeout(resolve, 300 * attempt));
+        }
+      }
+      if (!prepared) throw lastError;
+      toast.success("Database demo dikosongkan — mulai dari nol");
+      navigate("/app", { replace: true });
+    } catch (error) {
+      toast.error(errorMessage(error) || "Gagal masuk sebagai akun demo");
+    } finally {
+      setDemoPending(false);
     }
   };
 
@@ -137,16 +200,16 @@ export default function AuthPage() {
             <span className="text-lg font-bold">POS GG Online</span>
           </div>
 
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold tracking-tight">
-              {mode === "signIn" ? "Masuk ke workspace" : "Buat akun bisnis baru"}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {mode === "signIn"
-                ? "Lanjutkan pembukuan dan kasir bisnis Anda."
-                : "Akun baru otomatis mendapat Chart of Accounts dan data contoh siap pakai."}
-            </p>
-          </div>
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold tracking-tight">
+            {mode === "signIn" ? "Masuk ke workspace" : "Buat akun bisnis baru"}
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {mode === "signIn"
+              ? "Lanjutkan pembukuan dan kasir bisnis Anda."
+              : "Database baru dibuat kosong — hanya Chart of Accounts dan satu gudang default."}
+          </p>
+        </div>
 
           {backendBlocked ? (
             <div className="mb-5 rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-400/30 dark:bg-amber-400/10">
@@ -265,6 +328,51 @@ export default function AuthPage() {
               <span className="h-px flex-1 bg-border" />
             </div>
 
+            <button
+              type="button"
+              onClick={startDemo}
+              disabled={demoPending}
+              className="w-full rounded-xl border border-navy-900/15 bg-navy-900 p-4 text-left text-white transition-all hover:-translate-y-0.5 hover:shadow-md disabled:pointer-events-none disabled:opacity-60"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="flex items-center gap-1.5 text-sm font-bold">
+                    <Sparkles className="h-3.5 w-3.5 text-gg-lime" />
+                    {demoPending ? "Menyiapkan database demo…" : "Masuk sebagai akun demo"}
+                  </p>
+                  <p className="mt-1 text-xs text-white/60">
+                    Akun demo bersama dengan database kosong. Ikuti tutorial untuk mengisi
+                    barang sendiri dari nol.
+                  </p>
+                </div>
+                <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-gg-lime" />
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  window.localStorage.removeItem("posgg:tutorial:v1");
+                } catch {
+                  // abaikan
+                }
+                window.dispatchEvent(new Event("posgg:tutorial:start"));
+              }}
+              className="flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-gg-lime/60 hover:bg-gg-lime/10"
+            >
+              <div>
+                <p className="flex items-center gap-1.5 text-sm font-bold">
+                  <BookOpenCheck className="h-3.5 w-3.5 text-gg-teal" />
+                  Tutorial klik setiap menu
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Panduan langkah demi langkah, bisa dilewati kapan saja.
+                </p>
+              </div>
+              <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            </button>
+
             <Link to="/guest" className="block">
               <div className="w-full rounded-xl border border-gg-lime/60 bg-gg-lime/10 p-4 text-left transition-all hover:-translate-y-0.5 hover:bg-gg-lime/20 hover:shadow-md">
                 <div className="flex items-start justify-between gap-3">
@@ -274,8 +382,8 @@ export default function AuthPage() {
                       Buka Mode Demo, tanpa daftar
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Lihat seluruh menu program: dashboard, kasir, penjualan, laporan, dan
-                      buku besar. Maksimal 10 transaksi.
+                      Lihat seluruh menu program dengan data contoh, tanpa menyentuh database
+                      Anda. Maksimal 10 transaksi.
                     </p>
                   </div>
                   <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-primary" />

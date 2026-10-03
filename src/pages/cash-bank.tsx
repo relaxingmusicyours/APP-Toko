@@ -21,6 +21,7 @@ import { Field, Input, Select } from "@/components/ui/field";
 import { EmptyState, Loading, PageHeader, Stat, Tabs } from "@/components/ui/misc";
 import { Table, TBody, TD, TH, THead, TR, TableWrap } from "@/components/ui/table";
 import { cn, downloadCSV, errorMessage, formatDate, formatIDR, todayISO } from "@/lib/utils";
+import { useViewTarget } from "@/lib/view-target";
 
 export default function CashBank() {
   const accounts = useQuery(api.accounts.cashBankAccounts);
@@ -29,6 +30,11 @@ export default function CashBank() {
   const create = useMutation(api.cash.createCashTransaction);
 
   const [tab, setTab] = React.useState("transaksi");
+  // Dipicu dari pop-up pemilihan dokumen di sidebar.
+  useViewTarget((view) => {
+    if (view === "form") openForm();
+    else setTab("transaksi");
+  });
   const [formOpen, setFormOpen] = React.useState(false);
   const [direction, setDirection] = React.useState<"in" | "out" | "transfer">("in");
   const [date, setDate] = React.useState(todayISO());

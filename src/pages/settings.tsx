@@ -5,12 +5,21 @@ import {
   CheckCircle2,
   Circle,
   ClipboardCheck,
+  Eraser,
   History,
   ListChecks,
   Plus,
+  Printer,
   ScrollText,
+  Settings2,
   ShieldCheck,
   Sparkles,
+  Trash2,
+  UserCog,
+  UserPlus,
+  UsersRound,
+  Wallet,
+  Plug,
 } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
@@ -20,12 +29,130 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
+import { GithubIntegration } from "@/components/github-status";
+import { SettingsTools, type SettingsTile, type ToolId } from "@/components/settings-tools";
+import { TutorialLauncher } from "@/components/tutorial";
 import { Field, Input, Select } from "@/components/ui/field";
-import { Loading, PageHeader, Stat, Tabs } from "@/components/ui/misc";
+import { Loading, PageHeader, Stat } from "@/components/ui/misc";
 import { Table, TBody, TD, TH, THead, TR, TableWrap } from "@/components/ui/table";
 import { errorMessage, formatDateTime } from "@/lib/utils";
+import { useViewTarget } from "@/lib/view-target";
 
-type Tab = "perusahaan" | "akun" | "audit" | "roadmap" | "backlog";
+type Tab = "perusahaan" | "akun" | "audit" | "roadmap" | "backlog" | "integrasi" | ToolId;
+
+const DATE_FORMATS = [
+  { value: "dd/MM/yyyy", label: "31/12/2026" },
+  { value: "yyyy-MM-dd", label: "2026-12-31" },
+  { value: "MM/dd/yyyy", label: "12/31/2026" },
+];
+
+const CURRENCIES = [
+  { value: "IDR", label: "IDR — Rupiah Indonesia" },
+  { value: "USD", label: "USD — Dolar Amerika" },
+  { value: "SGD", label: "SGD — Dolar Singapura" },
+  { value: "MYR", label: "MYR — Ringgit Malaysia" },
+];
+
+const RECEIPT_SIZES = [
+  { value: "58mm", label: "58 mm — thermal kasir" },
+  { value: "80mm", label: "80 mm — thermal standar" },
+];
+
+
+
+const MEMBER_ROLES = [
+  { value: "manager", label: "Manajer" },
+  { value: "cashier", label: "Kasir" },
+  { value: "accountant", label: "Pembukuan" },
+] as const;
+
+/** Contoh tanggal hari ini mengikuti format yang dipilih. */
+function sampleDate(format: string): string {
+  const iso = new Date().toISOString().slice(0, 10);
+  const [year, month, day] = iso.split("-");
+  if (format === "yyyy-MM-dd") return iso;
+  if (format === "MM/dd/yyyy") return `${month}/${day}/${year}`;
+  return `${day}/${month}/${year}`;
+}
+
+/** Sakelar ringkas untuk preferensi boolean. */
+function ToggleRow({
+  label,
+  hint,
+  checked,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  hint: string;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      aria-pressed={checked}
+      className={
+        "flex w-full items-center justify-between gap-3 rounded-lg border border-border p-3 text-left transition-colors " +
+        "hover:border-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
+      }
+    >
+      <span>
+        <span className="block text-sm font-semibold">{label}</span>
+        <span className="block text-xs text-muted-foreground">{hint}</span>
+      </span>
+      <span
+        className={
+          "relative h-6 w-11 shrink-0 rounded-full transition-colors " +
+          (checked ? "bg-gg-teal" : "bg-secondary")
+        }
+      >
+        <span
+          className={
+            "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all " +
+            (checked ? "left-[22px]" : "left-0.5")
+          }
+        />
+      </span>
+    </button>
+  );
+}
+
+/** Ringkasan hak akses tiap peran — dipakai kartu Akses Grup. */
+const ROLE_PERMISSIONS: Array<{
+  role: string;
+  label: string;
+  desc: string;
+  perms: string[];
+}> = [
+  {
+    role: "owner",
+    label: "Pemilik",
+    desc: "Akses penuh, termasuk kelola anggota tim dan kosongkan database.",
+    perms: ["Semua modul", "Ubah profil & COA", "Kelola pengguna", "Kosongkan database"],
+  },
+  {
+    role: "manager",
+    label: "Manajer",
+    desc: "Operasional harian tanpa menghapus database.",
+    perms: ["Kasir & penjualan", "Pembelian & persediaan", "Laporan", "Ubah profil"],
+  },
+  {
+    role: "cashier",
+    label: "Kasir",
+    desc: "Fokus transaksi di kasir dan penerimaan pembayaran.",
+    perms: ["Kasir POS", "Terima pembayaran", "Lihat pelanggan"],
+  },
+  {
+    role: "accountant",
+    label: "Pembukuan",
+    desc: "Fokus jurnal, kas bank, dan laporan.",
+    perms: ["Buku besar & jurnal", "Kas & bank", "Laporan", "Kartu stok"],
+  },
+];
 
 const TYPE_OPTIONS = [
   { value: "asset", label: "Aset" },
@@ -174,11 +301,22 @@ export default function Settings() {
   const me = useQuery(api.company.me);
   const accounts = useQuery(api.accounts.list);
   const logs = useQuery(api.company.auditLogs);
+  const prefs = useQuery(api.preferences.preferences);
+  const members = useQuery(api.preferences.members);
+  const accessSummary = useQuery(api.preferences.accessSummary);
   const updateCompany = useMutation(api.company.updateCompany);
   const createAccount = useMutation(api.accounts.create);
   const toggleActive = useMutation(api.accounts.toggleActive);
+  const savePreferences = useMutation(api.preferences.savePreferences);
+  const inviteMember = useMutation(api.preferences.inviteMember);
+  const removeMember = useMutation(api.preferences.removeMember);
+  const toggleMember = useMutation(api.preferences.toggleMember);
 
   const [tab, setTab] = React.useState<Tab>("perusahaan");
+  // Dipicu dari pop-up pemilihan dokumen di sidebar.
+  useViewTarget((view) => {
+    if (view) setTab(view as Tab);
+  });
   const [qaChecked, setQaChecked] = React.useState<Record<string, boolean>>({});
 
   const p0Open =
@@ -199,6 +337,114 @@ export default function Settings() {
   const [accCode, setAccCode] = React.useState("");
   const [accName, setAccName] = React.useState("");
   const [accType, setAccType] = React.useState("expense");
+  const [wipeOpen, setWipeOpen] = React.useState(false);
+  const clearWorkspace = useMutation(api.company.clearWorkspace);
+
+  // Preferensi & desain cetakan
+  const [fiscalYear, setFiscalYear] = React.useState("");
+  const [dateFormat, setDateFormat] = React.useState("dd/MM/yyyy");
+  const [currency, setCurrency] = React.useState("IDR");
+  const [defaultTaxRate, setDefaultTaxRate] = React.useState<number | "">(11);
+  const [lowStockAlert, setLowStockAlert] = React.useState(true);
+  const [receiptSize, setReceiptSize] = React.useState("80mm");
+  const [receiptFooter, setReceiptFooter] = React.useState("");
+  const [showReceiptLogo, setShowReceiptLogo] = React.useState(true);
+  const [showTaxDetail, setShowTaxDetail] = React.useState(true);
+  const [prefsReady, setPrefsReady] = React.useState(false);
+
+  // Pengguna
+  const [memberOpen, setMemberOpen] = React.useState(false);
+  const [memberName, setMemberName] = React.useState("");
+  const [memberEmail, setMemberEmail] = React.useState("");
+  const [memberRole, setMemberRole] = React.useState("cashier");
+
+  React.useEffect(() => {
+    if (prefs && !prefsReady) {
+      setFiscalYear(prefs.fiscalYear);
+      setDateFormat(prefs.dateFormat);
+      setCurrency(prefs.currency);
+      setDefaultTaxRate(prefs.defaultTaxRate);
+      setLowStockAlert(prefs.lowStockAlert);
+      setReceiptSize(prefs.receiptSize);
+      setReceiptFooter(prefs.receiptFooter);
+      setShowReceiptLogo(prefs.showReceiptLogo);
+      setShowTaxDetail(prefs.showTaxDetail);
+      setPrefsReady(true);
+    }
+  }, [prefs, prefsReady]);
+
+  const submitPreferences = async () => {
+    setPending(true);
+    try {
+      await savePreferences({
+        fiscalYear,
+        dateFormat,
+        currency,
+        defaultTaxRate: Number(defaultTaxRate) || 0,
+        lowStockAlert,
+      });
+      toast.success("Preferensi disimpan");
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const submitPrintDesign = async () => {
+    setPending(true);
+    try {
+      await savePreferences({
+        receiptSize,
+        receiptFooter: receiptFooter || undefined,
+        showReceiptLogo,
+        showTaxDetail,
+      });
+      toast.success("Desain cetakan disimpan");
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const submitInvite = async () => {
+    setPending(true);
+    try {
+      await inviteMember({
+        name: memberName,
+        email: memberEmail,
+        role: memberRole as "manager" | "cashier" | "accountant",
+      });
+      toast.success("Anggota tim ditambahkan");
+      setMemberOpen(false);
+      setMemberName("");
+      setMemberEmail("");
+      setMemberRole("cashier");
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const runMemberAction = async (action: () => Promise<unknown>, successMessage: string) => {
+    try {
+      await action();
+      toast.success(successMessage);
+    } catch (error) {
+      toast.error(errorMessage(error));
+    }
+  };
+
+  const toggleMemberStatus = (memberId: Id<"companyMembers">, name: string, active: boolean) =>
+    runMemberAction(
+      () => toggleMember({ memberId }),
+      active ? `${name} dinonaktifkan` : `${name} diaktifkan`,
+    );
+
+  const deleteMember = (memberId: Id<"companyMembers">, name: string) =>
+    runMemberAction(() => removeMember({ memberId }), `${name} dihapus dari daftar`);
 
   React.useEffect(() => {
     if (me?.company && !initialized) {
@@ -237,28 +483,393 @@ export default function Settings() {
     }
   };
 
+  const submitWipe = async () => {
+    setPending(true);
+    try {
+      await clearWorkspace({});
+      toast.success("Database dikosongkan — COA dan gudang tetap tersedia");
+      setWipeOpen(false);
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
+      setPending(false);
+    }
+  };
+
   if (me === undefined || accounts === undefined || logs === undefined) {
     return <Loading label="Memuat pengaturan…" />;
   }
+
+  const sectionTiles: SettingsTile[] = [
+    {
+      id: "perusahaan",
+      label: "Perusahaan",
+      icon: Building2,
+      hint: "Profil, keamanan, kosongkan database",
+    },
+    {
+      id: "akun",
+      label: "Chart of Accounts",
+      icon: Wallet,
+      hint: "Akun sistem & pembantu",
+      count: accounts.length,
+    },
+    {
+      id: "audit",
+      label: "Audit Trail",
+      icon: History,
+      hint: "Jejak semua perubahan",
+      count: logs.length,
+    },
+    {
+      id: "roadmap",
+      label: "Roadmap",
+      icon: Sparkles,
+      hint: "Rencana MVP → Enterprise",
+    },
+    {
+      id: "backlog",
+      label: "Backlog & QA",
+      icon: ClipboardCheck,
+      hint: "Epic P0–P2 & test case",
+      count: OPEN_BACKLOG_COUNT,
+    },
+    {
+      id: "integrasi",
+      label: "Integrasi",
+      icon: Plug,
+      hint: "Status repo & environment",
+    },
+  ];
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Pengaturan"
-        description="Profil perusahaan, Chart of Accounts, audit trail, roadmap, backlog, dan checklist QA."
+        description="Profil perusahaan, menu Alat, audit trail, roadmap, backlog, dan checklist QA."
       />
 
-      <Tabs
-        value={tab}
-        onChange={(value) => setTab(value as Tab)}
-        tabs={[
-          { value: "perusahaan", label: "Perusahaan" },
-          { value: "akun", label: "Chart of Accounts", count: accounts.length },
-          { value: "audit", label: "Audit Trail", count: logs.length },
-          { value: "roadmap", label: "Roadmap" },
-          { value: "backlog", label: "Backlog & QA", count: OPEN_BACKLOG_COUNT },
-        ]}
-      />
+      <SettingsTools active={tab} onSelect={(id) => setTab(id as Tab)} extraTiles={sectionTiles} />
+
+      {tab === "preferensi" ? (
+        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+          <Card>
+            <div className="flex items-center gap-2 border-b border-border p-4">
+              <Settings2 className="h-4 w-4 text-muted-foreground" />
+              <p className="font-bold">Preferensi Umum</p>
+            </div>
+            <div className="grid gap-3 p-4 sm:grid-cols-2">
+              <Field label="Tahun Buku" hint="Dipakai pada laporan dan pembuka buku.">
+                <Input
+                  value={fiscalYear}
+                  inputMode="numeric"
+                  maxLength={4}
+                  onChange={(e) => setFiscalYear(e.target.value.replace(/\D/g, ""))}
+                  placeholder="2026"
+                />
+              </Field>
+              <Field label="Mata Uang" hint="Simbol yang dipakai di seluruh dokumen.">
+                <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                  {CURRENCIES.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Format Tanggal" hint={`Contoh hari ini: ${sampleDate(dateFormat)}`}>
+                <Select value={dateFormat} onChange={(e) => setDateFormat(e.target.value)}>
+                  {DATE_FORMATS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="PPN Default (%)" hint="Diisi otomatis pada faktur baru.">
+                <Input
+                  value={defaultTaxRate}
+                  inputMode="decimal"
+                  onChange={(e) =>
+                    setDefaultTaxRate(e.target.value === "" ? "" : Number(e.target.value.replace(",", ".")))
+                  }
+                />
+              </Field>
+              <div className="sm:col-span-2">
+                <ToggleRow
+                  label="Peringatan stok menipis"
+                  hint="Tampilkan banner saat barang menyentuh stok minimum di kasir."
+                  checked={lowStockAlert}
+                  onChange={setLowStockAlert}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Button
+                  variant="accent"
+                  onClick={submitPreferences}
+                  disabled={pending || fiscalYear.length !== 4}
+                >
+                  {pending ? "Menyimpan…" : "Simpan Preferensi"}
+                </Button>
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="flex items-center gap-2 border-b border-border p-4">
+              <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
+              <p className="font-bold">Ringkasan Aktif</p>
+            </div>
+            <div className="space-y-2 p-4 text-sm">
+              <div className="flex items-center justify-between rounded-lg bg-secondary p-3">
+                <span className="text-muted-foreground">Tahun buku</span>
+                <span className="num font-semibold">{fiscalYear || "—"}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg bg-secondary p-3">
+                <span className="text-muted-foreground">Mata uang</span>
+                <span className="num font-semibold">{currency}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg bg-secondary p-3">
+                <span className="text-muted-foreground">Format tanggal</span>
+                <span className="num font-semibold">{sampleDate(dateFormat)}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg bg-secondary p-3">
+                <span className="text-muted-foreground">PPN default</span>
+                <span className="num font-semibold">{Number(defaultTaxRate) || 0}%</span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg bg-secondary p-3">
+                <span className="text-muted-foreground">Peringatan stok</span>
+                <Badge variant={lowStockAlert ? "success" : "outline"}>
+                  {lowStockAlert ? "Aktif" : "Nonaktif"}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Pengaturan ini dipakai sebagai nilai awal saat membuat dokumen baru — nilai pada
+                dokumen lama tidak ikut berubah.
+              </p>
+            </div>
+          </Card>
+        </div>
+      ) : null}
+
+      {tab === "akses-grup" ? (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <UserCog className="h-4 w-4 text-muted-foreground" />
+            <p className="text-sm font-bold">Peran &amp; Hak Akses</p>
+            <Badge variant="outline">{ROLE_PERMISSIONS.length} peran</Badge>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {ROLE_PERMISSIONS.map((group) => {
+              const count = accessSummary?.find((row) => row.role === group.role)?.count ?? 0;
+              return (
+                <Card key={group.role} className="p-5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-bold">{group.label}</p>
+                    <Badge variant={group.role === "owner" ? "success" : "outline"}>
+                      {count} anggota
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{group.desc}</p>
+                  <ul className="mt-3 space-y-2 text-sm">
+                    {group.perms.map((perm) => (
+                      <li key={perm} className="flex items-start gap-2">
+                        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gg-teal" />
+                        <span className="text-foreground/85">{perm}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              );
+            })}
+          </div>
+          <Card className="border-dashed p-4 text-xs text-muted-foreground">
+            Penetapan peran ke orang dilakukan di tab <span className="font-semibold">Pengguna</span>.
+            Workflow approval berjenjang (diskon besar, void, voiding dokumen yang sudah dibayar)
+            masih masuk roadmap V2.
+          </Card>
+        </div>
+      ) : null}
+
+      {tab === "pengguna" ? (
+        <Card>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-4">
+            <div className="flex items-center gap-2">
+              <UsersRound className="h-4 w-4 text-muted-foreground" />
+              <p className="font-bold">Anggota Tim</p>
+              <Badge variant="outline">{(members ?? []).length} orang</Badge>
+            </div>
+            <Button variant="accent" size="sm" onClick={() => setMemberOpen(true)}>
+              <UserPlus className="h-3.5 w-3.5" /> Undang Pengguna
+            </Button>
+          </div>
+          <TableWrap>
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Nama</TH>
+                  <TH>Email</TH>
+                  <TH>Peran</TH>
+                  <TH>Status</TH>
+                  <TH />
+                </TR>
+              </THead>
+              <TBody>
+                {(members ?? []).map((member) => {
+                  const isOwner = member.role === "owner";
+                  const active = member.status === "active";
+                  return (
+                    <TR key={member._id}>
+                      <TD className="font-medium">
+                        {member.name}
+                        {member.email === me?.email ? (
+                          <span className="ml-1.5 text-xs text-muted-foreground">(Anda)</span>
+                        ) : null}
+                      </TD>
+                      <TD className="text-xs text-muted-foreground">{member.email}</TD>
+                      <TD>
+                        <Badge variant={isOwner ? "success" : "outline"}>{member.roleLabel}</Badge>
+                      </TD>
+                      <TD>
+                        <Badge variant={active ? "info" : "warning"}>
+                          {active ? "Aktif" : "Belum masuk"}
+                        </Badge>
+                      </TD>
+                      <TD>
+                        {isOwner ? (
+                          <span className="text-xs text-muted-foreground">Pemilik</span>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                toggleMemberStatus(member._id, member.name, active)
+                              }
+                            >
+                              {active ? "Nonaktifkan" : "Aktifkan"}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:bg-destructive/10"
+                              onClick={() => deleteMember(member._id, member.name)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        )}
+                      </TD>
+                    </TR>
+                  );
+                })}
+              </TBody>
+            </Table>
+          </TableWrap>
+          <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
+            Anggota baru berstatus <span className="font-semibold">Belum masuk</span> sampai
+            mendaftar memakai email yang sama. Akun pemilik tidak bisa dinonaktifkan atau dihapus.
+          </p>
+        </Card>
+      ) : null}
+
+      {tab === "desain-cetakan" ? (
+        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+          <Card>
+            <div className="flex items-center gap-2 border-b border-border p-4">
+              <Printer className="h-4 w-4 text-muted-foreground" />
+              <p className="font-bold">Desain Cetakan</p>
+            </div>
+            <div className="grid gap-3 p-4 sm:grid-cols-2">
+              <Field label="Lebar Struk">
+                <Select value={receiptSize} onChange={(e) => setReceiptSize(e.target.value)}>
+                  {RECEIPT_SIZES.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Footer Struk" hint="Tercetak di bawah ringkasan pembayaran.">
+                <Input
+                  value={receiptFooter}
+                  onChange={(e) => setReceiptFooter(e.target.value)}
+                  placeholder="Terima kasih telah berbelanja"
+                />
+              </Field>
+              <div className="space-y-2 sm:col-span-2">
+                <ToggleRow
+                  label="Tampilkan logo di struk"
+                  hint="Nama perusahaan dicetak sebagai Kop."
+                  checked={showReceiptLogo}
+                  onChange={setShowReceiptLogo}
+                />
+                <ToggleRow
+                  label="Tampilkan rincian PPN"
+                  hint="Pisahkan DPP dan PPN pada setiap baris."
+                  checked={showTaxDetail}
+                  onChange={setShowTaxDetail}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Button variant="accent" onClick={submitPrintDesign} disabled={pending}>
+                  {pending ? "Menyimpan…" : "Simpan Desain Cetakan"}
+                </Button>
+              </div>
+            </div>
+          </Card>
+
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Contoh struk
+            </p>
+            <div
+              className="w-full max-w-[300px] rounded-lg border border-border bg-white p-4 font-mono text-[11px] leading-snug text-black shadow-md"
+              style={receiptSize === "58mm" ? { maxWidth: 224 } : undefined}
+            >
+              <div className="text-center font-bold uppercase">
+                {showReceiptLogo ? name || "Toko GG Online" : "STRUK PEMBAYARAN"}
+              </div>
+              {showReceiptLogo ? (
+                <div className="mt-1 text-center">
+                  {address || "Alamat perusahaan"}
+                  {taxId ? <div>NPWP {taxId}</div> : null}
+                </div>
+              ) : null}
+              <div className="my-2 border-t border-dashed border-black/40" />
+              <div className="flex justify-between">
+                <span>No.</span>
+                <span>INV/2026/0001</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Tanggal</span>
+                <span>{sampleDate(dateFormat)}</span>
+              </div>
+              <div className="my-2 border-t border-dashed border-black/40" />
+              <div>2 x Bibit prices 5.000</div>
+              {showTaxDetail ? <div className="pl-2">PPN 11% 1.100</div> : null}
+              <div>1 x Pupuk 25 kg 65.000</div>
+              {showTaxDetail ? <div className="pl-2">PPN 11% 7.150</div> : null}
+              <div className="my-2 border-t border-dashed border-black/40" />
+              <div className="flex justify-between font-bold">
+                <span>TOTAL</span>
+                <span>Rp 78.250</span>
+              </div>
+              {showTaxDetail ? (
+                <div className="flex justify-between">
+                  <span>DPP</span>
+                  <span>Rp 70.500</span>
+                </div>
+              ) : null}
+              <div className="my-2 border-t border-dashed border-black/40" />
+              <div className="text-center">{receiptFooter || "Terima kasih telah berbelanja"}</div>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Pratinjau kasar — hasil sebenarnya mengikuti printer thermal Anda.
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       {tab === "perusahaan" ? (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -319,6 +930,33 @@ export default function Settings() {
                   Peran &amp; approval berjenjang (V2), e-Faktur &amp; integrasi bank (V3), SSO
                   (Enterprise).
                 </p>
+              </div>
+              <div className="rounded-lg border border-border p-3">
+                <p className="flex items-center gap-1.5 font-semibold">
+                  <Sparkles className="h-3.5 w-3.5 text-gg-teal" /> Butuh panduan langkah demi
+                  langkah?
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Tutorial berjalan mengikuti setiap menu program dan bisa dilewati kapan saja.
+                </p>
+                <TutorialLauncher className="mt-2" />
+              </div>
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                <p className="flex items-center gap-1.5 font-semibold text-destructive">
+                  <Eraser className="h-3.5 w-3.5" /> Kosongkan database
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Hapus semua transaksi, jurnal, dan master data. Chart of Accounts dan Gudang
+                  Utama tetap ada. Berguna untuk mulai pembukuan dari nol.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 border-destructive/40 text-destructive hover:bg-destructive/10"
+                  onClick={() => setWipeOpen(true)}
+                >
+                  Kosongkan database
+                </Button>
               </div>
             </div>
           </Card>
@@ -627,6 +1265,92 @@ export default function Settings() {
           </Card>
         </div>
       ) : null}
+
+      {tab === "integrasi" ? <GithubIntegration /> : null}
+
+      {/* INVITE MEMBER DIALOG */}
+      <Dialog
+        open={memberOpen}
+        onClose={() => setMemberOpen(false)}
+        title="Undang Pengguna"
+        description="Anggota akan terhubung otomatis begitu mendaftar memakai email ini."
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setMemberOpen(false)}>
+              Batal
+            </Button>
+            <Button
+              variant="accent"
+              onClick={submitInvite}
+              disabled={pending || !memberName.trim() || !memberEmail.trim()}
+            >
+              {pending ? "Menyimpan…" : "Undang"}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <Field label="Nama Lengkap">
+            <Input
+              value={memberName}
+              onChange={(e) => setMemberName(e.target.value)}
+              placeholder="Siti Rahma"
+            />
+          </Field>
+          <Field label="Email" hint="Dipakai untuk masuk dan terhubung ke akun perusahaan.">
+            <Input
+              value={memberEmail}
+              type="email"
+              onChange={(e) => setMemberEmail(e.target.value)}
+              placeholder="siti@tokoanda.com"
+            />
+          </Field>
+          <Field label="Peran" hint="Bisa diubah nanti dari daftar anggota.">
+            <Select value={memberRole} onChange={(e) => setMemberRole(e.target.value)}>
+              {MEMBER_ROLES.map((role) => (
+                <option key={role.value} value={role.value}>
+                  {role.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+      </Dialog>
+
+      {/* WIPE DIALOG */}
+      <Dialog
+        open={wipeOpen}
+        onClose={() => setWipeOpen(false)}
+        title="Kosongkan database?"
+        description="Tindakan ini tidak bisa dibatalkan."
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setWipeOpen(false)}>
+              Batal
+            </Button>
+            <Button variant="destructive" onClick={submitWipe} disabled={pending}>
+              {pending ? "Menghapus…" : "Ya, kosongkan"}
+            </Button>
+          </>
+        }
+      >
+        <div className="flex items-start gap-3 text-sm">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          <div className="space-y-2">
+            <p>Yang akan dihapus permanen:</p>
+            <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+              <li>Barang &amp; jasa, pelanggan, pemasok</li>
+              <li>Faktur penjualan, pembelian, retur, dan penerimaan/pembayaran</li>
+              <li>Seluruh jurnal, kartu stok, dan aset tetap</li>
+            </ul>
+            <p className="text-muted-foreground">
+              Yang tetap ada: Chart of Accounts sistem dan Gudang Utama.
+            </p>
+          </div>
+        </div>
+      </Dialog>
 
       {/* ACCOUNT DIALOG */}
       <Dialog

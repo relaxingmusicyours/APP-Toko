@@ -12,6 +12,7 @@ import { Field, Input, Select } from "@/components/ui/field";
 import { EmptyState, Loading, PageHeader, Tabs } from "@/components/ui/misc";
 import { Table, TBody, TD, TH, THead, TR, TableWrap } from "@/components/ui/table";
 import { downloadCSV, errorMessage, formatIDR } from "@/lib/utils";
+import { useViewTarget } from "@/lib/view-target";
 
 type Tab = "pelanggan" | "pemasok" | "barang" | "gudang";
 
@@ -28,6 +29,12 @@ export default function Masters() {
   const saveWarehouse = useMutation(api.masters.saveWarehouse);
 
   const [tab, setTab] = React.useState<Tab>("pelanggan");
+  // Dipicu dari pop-up pemilihan dokumen di sidebar.
+  useViewTarget((view) => {
+    if (view === "pelanggan" || view === "pemasok" || view === "barang" || view === "gudang") {
+      setTab(view);
+    }
+  });
   const [search, setSearch] = React.useState("");
 
   // dialogs
@@ -329,6 +336,18 @@ export default function Masters() {
       ) : null}
 
       {tab === "barang" ? (
+        items.length === 0 ? (
+          <EmptyState
+            title="Belum ada barang atau jasa"
+            description="Tambahkan produk pertama Anda. Centang “Lacak stok” untuk barang dagangan; hilangkan untuk jasa agar stok tidak dihitung."
+            icon={<Package className="h-8 w-8" />}
+            action={
+              <Button variant="accent" size="sm" onClick={() => openItem()}>
+                <Plus className="h-3.5 w-3.5" /> Tambah Barang / Jasa
+              </Button>
+            }
+          />
+        ) : (
         <Card>
           <TableWrap>
             <Table>
@@ -374,6 +393,7 @@ export default function Masters() {
             </Table>
           </TableWrap>
         </Card>
+        )
       ) : null}
 
       {tab === "gudang" ? (

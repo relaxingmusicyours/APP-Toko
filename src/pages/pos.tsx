@@ -3,6 +3,7 @@ import {
   Banknote,
   CreditCard,
   Minus,
+  Package,
   Plus,
   Printer,
   QrCode,
@@ -12,6 +13,7 @@ import {
   Wallet,
 } from "lucide-react";
 import * as React from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -51,6 +53,7 @@ const METHODS = [
 ];
 
 export default function Pos() {
+  const navigate = useNavigate();
   const items = useQuery(api.masters.items);
   const stockReport = useQuery(api.inventory.stockReport);
   const warehouses = useQuery(api.masters.warehouses);
@@ -260,7 +263,20 @@ export default function Pos() {
           </div>
 
           {filtered.length === 0 ? (
-            <EmptyState title="Barang tidak ditemukan" description="Coba kata kunci lain." />
+            items.length === 0 ? (
+              <EmptyState
+                title="Belum ada barang untuk dijual"
+                description="Tambahkan barang atau jasa dulu di menu Master Data, lalu barangnya langsung muncul di grid kasir ini."
+                icon={<Package className="h-8 w-8" />}
+                action={
+                  <Button variant="accent" size="sm" onClick={() => navigate("/app/master-data")}>
+                    <Package className="h-3.5 w-3.5" /> Buka Master Data
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState title="Barang tidak ditemukan" description="Coba kata kunci lain." />
+            )
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
               {filtered.map((item: any) => {

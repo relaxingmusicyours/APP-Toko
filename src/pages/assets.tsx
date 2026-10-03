@@ -21,6 +21,7 @@ import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { EmptyState, Loading, PageHeader, Stat, Tabs } from "@/components/ui/misc";
 import { Table, TBody, TD, TH, THead, TR, TableWrap } from "@/components/ui/table";
 import { cn, currentMonthISO, downloadCSV, errorMessage, formatDate, formatIDR, todayISO } from "@/lib/utils";
+import { useViewTarget } from "@/lib/view-target";
 
 export default function Assets() {
   const assets = useQuery(api.assets.listAssets);
@@ -32,6 +33,12 @@ export default function Assets() {
   const dispose = useMutation(api.assets.dispose);
 
   const [tab, setTab] = React.useState("daftar");
+  // Dipicu dari pop-up pemilihan dokumen di sidebar.
+  useViewTarget((view) => {
+    if (view === "acquire") openAcquire();
+    else if (view === "dep") setDepOpen(true);
+    else if (view === "daftar" || view === "jadwal") setTab(view);
+  });
   const [acquireOpen, setAcquireOpen] = React.useState(false);
   const [depOpen, setDepOpen] = React.useState(false);
   const [disposeTarget, setDisposeTarget] = React.useState<any>(null);

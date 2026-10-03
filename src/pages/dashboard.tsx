@@ -30,6 +30,7 @@ import { api } from "@/convex/_generated/api";
 import { Badge, StatusChip } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, Loading, PageHeader, Stat } from "@/components/ui/misc";
+import { TutorialInvite } from "@/components/tutorial";
 import { Button } from "@/components/ui/button";
 import {
   currentMonthISO,
@@ -107,6 +108,11 @@ export default function Dashboard() {
           </>
         }
       />
+
+      {/* ONBOARDING — hanya muncul selagi workspace masih kosong */}
+      {dashboard.counts.items === 0 && dashboard.counts.invoices === 0 ? (
+        <TutorialInvite />
+      ) : null}
 
       {/* KPI ROW */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

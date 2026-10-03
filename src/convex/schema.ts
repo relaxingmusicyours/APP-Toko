@@ -20,7 +20,36 @@ export default defineSchema({
     address: v.optional(v.string()),
     phone: v.optional(v.string()),
     seeded: v.boolean(),
+    // Preferensi perusahaan (menu Pengaturan → Preferensi)
+    fiscalYear: v.optional(v.string()),
+    dateFormat: v.optional(v.string()),
+    currency: v.optional(v.string()),
+    defaultTaxRate: v.optional(v.number()),
+    lowStockAlert: v.optional(v.boolean()),
+    // Desain cetakan (menu Pengaturan → Desain Cetakan)
+    receiptSize: v.optional(v.string()),
+    receiptFooter: v.optional(v.string()),
+    showReceiptLogo: v.optional(v.boolean()),
+    showTaxDetail: v.optional(v.boolean()),
   }).index("by_owner", ["ownerId"]),
+
+  // Anggota tim per perusahaan (menu Pengaturan → Pengguna)
+  companyMembers: defineTable({
+    companyId: v.id("companies"),
+    userId: v.optional(v.id("users")),
+    email: v.string(),
+    name: v.string(),
+    role: v.union(
+      v.literal("owner"),
+      v.literal("manager"),
+      v.literal("cashier"),
+      v.literal("accountant"),
+    ),
+    status: v.union(v.literal("active"), v.literal("invited")),
+    invitedAt: v.number(),
+  })
+    .index("by_company", ["companyId"])
+    .index("by_company_email", ["companyId", "email"]),
 
   // Chart of accounts
   accounts: defineTable({

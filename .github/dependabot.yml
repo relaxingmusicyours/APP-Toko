@@ -1,0 +1,24 @@
+version: 2
+
+# GitHub Advanced Security — Dependabot: peringatan keamanan dependensi
+# dan PR pembaruan otomatis untuk package npm serta GitHub Actions.
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    commit-message:
+      prefix: deps
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    labels: [dependencies]
+    commit-message:
+      prefix: ci

@@ -15,8 +15,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
+import { InventoryMenu } from "@/components/inventory-menu";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
-import { Loading, PageHeader, Stat, Tabs } from "@/components/ui/misc";
+import { Loading, PageHeader, Stat } from "@/components/ui/misc";
 import { Table, TBody, TD, TH, THead, TR, TableWrap } from "@/components/ui/table";
 import {
   cn,
@@ -27,6 +28,7 @@ import {
   formatNumber,
   todayISO,
 } from "@/lib/utils";
+import { useViewTarget } from "@/lib/view-target";
 
 export default function Inventory() {
   const stockReport = useQuery(api.inventory.stockReport);
@@ -117,6 +119,13 @@ export default function Inventory() {
     }
   };
 
+  // Dipicu dari pop-up pemilihan dokumen di sidebar.
+  useViewTarget((view) => {
+    if (view === "riwayat") setTab("kartu");
+    else if (view === "kartu-stok") setTab("stok");
+    else if (view === "perintah-opname") openOpname();
+  });
+
   if (stockReport === undefined || movements === undefined) {
     return <Loading label="Memuat persediaan…" />;
   }
@@ -149,13 +158,10 @@ export default function Inventory() {
         />
       </div>
 
-      <Tabs
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          { value: "stok", label: "Kartu Stok" },
-          { value: "kartu", label: "Riwayat Pergerakan" },
-        ]}
+      <InventoryMenu
+        active={tab === "kartu" ? "riwayat" : "kartu-stok"}
+        onSelect={(id) => setTab(id === "riwayat" ? "kartu" : "stok")}
+        onOpenOpname={() => openOpname()}
       />
 
       {tab === "stok" ? (

@@ -13,6 +13,7 @@ import {
   Undo2,
 } from "lucide-react";
 import * as React from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -22,6 +23,7 @@ import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { EmptyState, Loading, PageHeader, Stat, Tabs } from "@/components/ui/misc";
+import { SalesMenu } from "@/components/sales-menu";
 import { Table, TBody, TD, TH, THead, TR, TableWrap } from "@/components/ui/table";
 import {
   cn,
@@ -31,6 +33,7 @@ import {
   formatIDR,
   todayISO,
 } from "@/lib/utils";
+import { useViewTarget } from "@/lib/view-target";
 
 interface LineDraft {
   itemId: string;
@@ -40,6 +43,7 @@ interface LineDraft {
 }
 
 export default function Sales() {
+  const navigate = useNavigate();
   const invoices = useQuery(api.sales.listInvoices);
   const customers = useQuery(api.masters.customers);
   const items = useQuery(api.masters.items);
@@ -135,6 +139,12 @@ export default function Sales() {
     setLines([{ itemId: "", qty: 1, price: 0, discount: 0 }]);
     setFormOpen(true);
   };
+
+  // Dipicu dari pop-up pemilihan dokumen di sidebar.
+  useViewTarget((view) => {
+    if (view === "invoice") openForm();
+    else if (view === "posted" || view === "retur") setTab(view);
+  });
 
   const submitInvoice = async () => {
     const validLines = lines.filter((line) => line.itemId && line.qty > 0);
@@ -256,6 +266,13 @@ export default function Sales() {
             </Button>
           </>
         }
+      />
+
+      <SalesMenu
+        onNewInvoice={openForm}
+        onShowReceipts={() => setTab("posted")}
+        onShowReturns={() => setTab("retur")}
+        onOpenCustomers={() => navigate("/app/master-data")}
       />
 
       <div className="grid gap-4 sm:grid-cols-3">

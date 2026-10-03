@@ -19,6 +19,7 @@ import { Field, Input, Select } from "@/components/ui/field";
 import { EmptyState, Loading, PageHeader, Tabs } from "@/components/ui/misc";
 import { Table, TBody, TD, TH, THead, TR, TableWrap } from "@/components/ui/table";
 import { cn, downloadCSV, errorMessage, formatIDR, todayISO } from "@/lib/utils";
+import { useViewTarget } from "@/lib/view-target";
 
 interface LineDraft {
   accountId: string;
@@ -40,6 +41,11 @@ export default function Ledger() {
   const createManual = useMutation(api.journals.createManual);
 
   const [tab, setTab] = React.useState("jurnal");
+  // Dipicu dari pop-up pemilihan dokumen di sidebar.
+  useViewTarget((view) => {
+    if (view === "form") openForm();
+    else if (view === "jurnal" || view === "coa" || view === "buku") setTab(view);
+  });
   const [ledgerAccountId, setLedgerAccountId] = React.useState<Id<"accounts"> | "">("");
   const [formOpen, setFormOpen] = React.useState(false);
   const [date, setDate] = React.useState(todayISO());
