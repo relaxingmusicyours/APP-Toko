@@ -2,7 +2,7 @@ name: Deploy Convex
 
 # Menjalankan 'bunx convex deploy' setiap push ke main:
 # kode di src/convex/ otomatis ter-deploy ke deployment Convex
-# grateful-dolphin-835 (dev), ditentukan oleh CONVEX_DEPLOY_KEY.
+# kindhearted-hyena-705 (dev), ditentukan oleh CONVEX_DEPLOY_KEY.
 # Folder fungsi dibaca dari convex.json ("functions": "src/convex/"),
 # jadi workflow ini aman meski folder fungsi tidak di ./convex.
 
@@ -43,7 +43,6 @@ jobs:
           fi
           bunx convex deploy --typecheck disable
         env:
-          # Nama deployment bukan rahasia: bisa diubah lewat repository variable
-          # CONVEX_DEPLOYMENT, default ke deployment dev proyek ini.
-          CONVEX_DEPLOYMENT: ${{ vars.CONVEX_DEPLOYMENT || 'grateful-dolphin-835' }}
+          # Tidak perlu CONVEX_DEPLOYMENT: kalau CONVEX_DEPLOY_KEY
+          # terisi, Convex CLI langsung deploy ke deployment milik key itu.
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
