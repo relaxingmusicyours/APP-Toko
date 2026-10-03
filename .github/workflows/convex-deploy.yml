@@ -34,7 +34,17 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      - name: Pastikan deploy key tersedia
+        if: ${{ secrets.CONVEX_DEPLOY_KEY == '' }}
+        run: |
+          echo "::error::Secret CONVEX_DEPLOY_KEY belum diisi."
+          echo "Isi di GitHub: Settings > Secrets and variables > Actions > New repository secret."
+          exit 1
+
       - name: Deploy functions to Convex
         run: bunx convex deploy --typecheck disable
         env:
+          # Nama deployment bukan rahasia: bisa diubah lewat repository variable
+          # CONVEX_DEPLOYMENT, default ke deployment dev proyek ini.
+          CONVEX_DEPLOYMENT: ${{ vars.CONVEX_DEPLOYMENT || 'grateful-dolphin-835' }}
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
